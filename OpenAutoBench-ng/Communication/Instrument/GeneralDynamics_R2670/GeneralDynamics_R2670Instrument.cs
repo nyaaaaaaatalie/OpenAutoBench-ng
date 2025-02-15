@@ -184,7 +184,18 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
             throw new NotImplementedException();
         }
 
-        public async Task SetupExtendedRXTest()
+        public async Task SetupRXTestFMMod()
+        {
+            //Not implemented, but shouldn't raise an exception
+        }
+
+        public async Task SetupRXTestP25BER()
+        {
+            //Not implemented, but shouldn't raise an exception
+
+        }
+
+        public async Task GenerateP25STDCal(float power)
         {
             //Not implemented, but shouldn't raise an exception
         }

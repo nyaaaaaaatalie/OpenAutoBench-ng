@@ -47,7 +47,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             LogCallback(String.Format("Setting up for {0}", name));
             await Instrument.SetDisplay(InstrumentScreen.Generate);
             await Task.Delay(1000);
-            await Instrument.SetupExtendedRXTest();
+            await Instrument.SetupRXTestFMMod();
             await Task.Delay(1000);
         }
 
@@ -66,11 +66,20 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     byte[] rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI);
                     await Instrument.StopGenerating();
                     LogCallback(String.Format("Measured RSSI at {0}MHz: {1}", (i / 1000000D), rssi[0]));
-                    
+
 
                     if (Instrument.SupportsP25)
                     {
-                        
+                        Radio.SetReceiveConfig(XCMPRadioReceiveOption.STD_1011);
+                        await Instrument.SetupRXTestP25BER();
+                        await Task.Delay(1000);
+                        await Instrument.GenerateP25STDCal(-116);
+                        await Task.Delay(5000);
+                        string BER = Radio.GetP25BER(4);
+                        await Instrument.StopGenerating();
+                        LogCallback(String.Format("Measured BER at {0}MHz: {1}", (i / 1000000D), BER));
+                        await Instrument.SetupRXTestFMMod();
+                        await Task.Delay(1000);
                     }
                     else
                     {
@@ -83,10 +92,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             {
                 LogCallback(String.Format("Test failed: {0}", ex.ToString()));
                 throw new Exception("Test failed.", ex);
-            }
-            finally
-            {
-                Radio.Dekey();
             }
 
         }

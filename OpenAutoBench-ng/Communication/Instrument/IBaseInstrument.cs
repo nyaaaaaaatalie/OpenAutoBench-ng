@@ -48,6 +48,11 @@
 
         public Task SetupTXP25BERTest();
 
-        public Task SetupExtendedRXTest();
+        public Task SetupRXTestFMMod();
+
+        public Task SetupRXTestP25BER();
+
+        public Task GenerateP25STDCal(float power);
+        
     }
 }

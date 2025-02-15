@@ -200,10 +200,22 @@ namespace OpenAutoBench_ng.Communication.Instrument.Astronics_R8000
             //Not implemented, but shouldn't raise an exception
         }
 
-        public async Task SetupExtendedRXTest()
+        public async Task SetupRXTestFMMod()
         {
             //Not implemented, but shouldn't raise an exception
         }
+
+        public async Task SetupRXTestP25BER()
+        {
+            //Not implemented, but shouldn't raise an exception
+
+        }
+
+        public async Task GenerateP25STDCal(float power)
+        {
+            //Not implemented, but shouldn't raise an exception
+        }
+
     }
 }
 
