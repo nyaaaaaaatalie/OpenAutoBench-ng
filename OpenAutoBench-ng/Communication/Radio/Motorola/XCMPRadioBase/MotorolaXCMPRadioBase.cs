@@ -362,5 +362,143 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             throw new NotImplementedException();
         }
 
+        public string GetP25BER(int nbrFrames)
+        {
+            byte[] cmd = new byte[4];
+
+            // receive config opcode
+            cmd[0] = 0x00;
+            cmd[1] = 0x03;
+
+            cmd[2] = 0x21; //test Pattern - P25 1011 Standard
+            cmd[3] = 0x00; // Mod Type - C4FM
+
+            byte[] reply = Send(cmd);
+
+            System.Threading.Thread.Sleep(500);
+
+            //BER RX Test initialization opcode
+            byte[]cmd1 = new byte[4];
+            cmd1[0] = 0x00;
+            cmd1[1] = 0x16;
+
+            cmd1[2] = 0x02; //Operation
+            cmd1[3] = (byte)nbrFrames; //Number of frames to be integrated for the BER measurement
+
+            Send(cmd1);
+
+            System.Threading.Thread.Sleep(800 * nbrFrames); // Giving the radio enough time before pulling BER measurement
+
+            byte[] cmd2 = new byte[2];
+            
+            //RX BER SYNC Report opcode
+            cmd2[0] = 0x00;
+            cmd2[1] = 0x17;
+
+            byte[] result = Send(cmd2);
+
+            System.Threading.Thread.Sleep(500);
+
+            //Discarding the 1st 3 bytes
+            byte[] berReply = new byte[25];
+            Array.Copy(result, 3, berReply, 0, 25);
+
+            return CalculateP25BER(nbrFrames, berReply);
+        }
+
+
+        private static string CalculateP25BER(int nbrFrames, byte[] berReply)
+        {
+            string noOfBitError = ""; // Stores the number of bit errors as a string.
+            string bitErrorPercentage = "Error"; // Default return value if calculation fails.
+
+            int chunks = berReply.Length / 5; // Each chunk in the byte array is 5 bytes long.
+            int lastFrameNumber = 0; // Tracks the last valid frame number.
+            int currentIndex = 0; // Tracks the current index in the byte array.
+            int totalBitsPerFrame = 3456; // Number of bits per frame for calculation.
+
+            // Process each 5-byte chunk.
+            while (chunks != 0)
+            {
+                int frameNumber = berReply[currentIndex]; // Extract the frame number from the first byte.
+
+                if (frameNumber != 0) // Only process if the frame number is non-zero.
+                {
+                    // Handle wrap-around of frame numbers (assuming frame numbers cycle at 255).
+                    if (lastFrameNumber == 255)
+                    {
+                        lastFrameNumber = 0;
+                    }
+
+                    // If the frame number is smaller than the last one, skip this chunk.
+                    if (frameNumber < lastFrameNumber)
+                    {
+                        currentIndex += 5; // Move to the next chunk.
+                        chunks--; // Decrease the chunk count.
+                        continue;
+                    }
+
+                    // Analyze the second byte for sync status.
+                    if (berReply[currentIndex + 1] == 1)
+                    {
+                        // "No Sync Detected"
+                    }
+                    else if (berReply[currentIndex + 1] == 0)
+                    {
+                        // "Sync Detected"
+                    }
+                    else if (berReply[currentIndex + 1] == 2)
+                    {
+                        // "Sync Indeterminate"
+                    }
+
+                    // If the current frame number is not greater than the last one, skip this chunk.
+                    if (lastFrameNumber >= frameNumber)
+                    {
+                        currentIndex += 5; // Move to the next chunk.
+                        chunks--; // Decrease the chunk count.
+                        continue;
+                    }
+
+                    // Update the last processed frame number.
+                    lastFrameNumber = frameNumber;
+
+                    // Extract the 4-byte bit error count from the chunk (starting at the 3rd byte).
+                    long bitErrorCount = Convert4ByteArraytoLong(0, berReply[currentIndex + 2], berReply[currentIndex + 3], berReply[currentIndex + 4]);
+                    noOfBitError = bitErrorCount.ToString(); // Update the bit error count string.
+
+                    // Calculate the bit error percentage.
+                    double numerator = (double)(bitErrorCount * 100L); // Scale bit error count to percentage.
+                    double denominator = (double)(nbrFrames * totalBitsPerFrame); // Total bits in all frames.
+                    double errorPercentage = numerator / denominator;
+
+                    // Format the error percentage to 4 decimal places.
+                    bitErrorPercentage = string.Format("{0:F4}%", errorPercentage);
+                }
+
+                currentIndex += 5; // Move to the next chunk.
+                chunks--; // Decrease the chunk count.
+            }
+
+            return bitErrorPercentage;
+        }
+
+        private static long Convert4ByteArraytoLong(byte byte1, byte byte2, byte byte3, byte byte4)
+        {
+            // Convert each byte to a long (to ensure no data loss during bitwise operations).
+            long byte1AsLong = (long)((ulong)byte1); // Most significant byte (MSB)
+            long byte2AsLong = (long)((ulong)byte2);
+            long byte3AsLong = (long)((ulong)byte3);
+            long byte4AsLong = (long)((ulong)byte4); // Least significant byte (LSB)
+
+            // Shift the bytes into their proper positions in a 32-bit number.
+            long byte1Shifted = byte1AsLong << 24; // Shift MSB to the most significant position.
+            long byte2Shifted = byte2AsLong << 16; // Shift to the second-most significant position.
+            long byte3Shifted = byte3AsLong << 8;  // Shift to the third-most significant position.
+
+            // Combine all the shifted values to reconstruct the original 32-bit value.
+            return byte1Shifted + byte2Shifted + byte3Shifted + byte4AsLong;
+        }
+
     }
 }

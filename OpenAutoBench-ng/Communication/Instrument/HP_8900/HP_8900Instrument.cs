@@ -173,9 +173,20 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
             throw new NotImplementedException("HP 8900 does not support digital tests.");
         }
 
-        public async Task SetupExtendedRXTest()
+        public async Task SetupRXTestFMMod()
         {
             //Not implemented, but shouldn't raise an exception
+        }
+
+        public async Task SetupRXTestP25BER()
+        {
+            throw new NotImplementedException("HP 8900 does not support digital tests.");
+
+        }
+
+        public async Task GenerateP25STDCal(float power)
+        {
+            throw new NotImplementedException("HP 8900 does not support digital tests.");
         }
     }
 }

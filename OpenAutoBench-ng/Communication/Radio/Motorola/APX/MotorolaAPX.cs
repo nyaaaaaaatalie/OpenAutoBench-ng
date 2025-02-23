@@ -50,6 +50,27 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
 
             await Task.Delay(1000);
 
+            if(testParams.doRssiTest)
+            {
+                MotorolaAPX_TestRX_RSSI test = new MotorolaAPX_TestRX_RSSI(testParams);
+                await test.setup();
+                await test.performTest();
+                await test.teardown();
+            }
+
+            await Task.Delay(1000);
+
+            if (testParams.doRxBer)
+            {
+                MotorolaAPX_TestRX_P25_BER test = new MotorolaAPX_TestRX_P25_BER(testParams);
+                await test.setup();
+                await test.performTest();
+                await test.teardown();
+
+            }
+
+            await Task.Delay(1000);
+
             if (testParams.doTxExtendedTest)
             {
                 MotorolaAPX_TestTX_ExtendedFreq test = new MotorolaAPX_TestTX_ExtendedFreq(testParams);

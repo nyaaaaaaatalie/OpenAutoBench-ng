@@ -188,15 +188,34 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
             await Send("Ber RESETErrors"); // Reset Error counter
         }
 
-        public async Task SetupExtendedRXTest()
+        public async Task SetupRXTestFMMod()
         {
             await Send("Generator RFOUTput 0"); // Set Generator to T/R Port
             await Send("Generator DCPOWer 1"); // Turn Generator Mode On
             await Send("Generator PTT 0"); // Sets the Generator to Off
+            await Send("Generator MOD 1"); // Sets Generator to FM Modulation
             await Send("FGen MODe3 1");  //Set Function Generator to Tone injection mode
             await Send("FGen Freq3 1000"); // 1KHz Tone Modulation
             await Send("FGen Dev3 3"); // 3kHz Deviation
             await Send("FGen SH3 0"); // Sine audio wave shape
+        }
+
+        public async Task SetupRXTestP25BER()
+        {
+            await Send("Generator RFOUTput 0"); // Set Generator to T/R Port
+            await Send("Generator DCPOWer 1"); // Turn Generator Mode On
+            await Send("Generator PTT 0"); // Sets the Generator to Off
+            await Send("FGen MODe3 0");  //Disable Funtion Generator
+            await Send("Generator MOD 8"); //Sets Generator to P25 Modulation
+            await Send("Generator P25Mode 4"); // Sets 1011HZ Std pattern
+
+        }
+
+        public async Task GenerateP25STDCal(float power)
+        {
+            await Send($"Generator RFLEVel {power.ToString()}"); //Set Generator Power level
+            await Task.Delay(1000);
+            await Send("Generator PTT 1"); //Send signal
         }
     }
 }

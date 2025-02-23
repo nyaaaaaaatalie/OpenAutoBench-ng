@@ -61,11 +61,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 {
                     Radio.SetTXFrequency(TXFrequencies[i], false);
                     await Instrument.SetRxFrequency(TXFrequencies[i]);
-                    
+
                     // low power
                     Radio.Keyup();
-                    await Task.Delay(100);
-                    Radio.SoftpotUpdate(0x01, CharPoints[i*2]);
+                    await Task.Delay(500);
+                    Radio.SoftpotUpdate(0x01, CharPoints[i * 2]);
                     await Task.Delay(5000);
                     float measPow = await Instrument.MeasurePower();
                     measPow = (float)Math.Round(measPow, 2);
@@ -75,8 +75,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
                     // high power
                     Radio.Keyup();
-                    await Task.Delay(100);
-                    Radio.SoftpotUpdate(0x01, CharPoints[i*2+1]);
+                    await Task.Delay(500);
+                    Radio.SoftpotUpdate(0x01, CharPoints[i * 2 + 1]);
                     await Task.Delay(5000);
                     measPow = await Instrument.MeasurePower();
                     measPow = (float)Math.Round(measPow, 2);
