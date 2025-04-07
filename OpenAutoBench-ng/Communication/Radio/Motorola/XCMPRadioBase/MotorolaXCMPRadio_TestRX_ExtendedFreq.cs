@@ -5,53 +5,35 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 {
     public class MotorolaXCMPRadio_TestRX_ExtendedFreq : IBaseTest
     {
-        public string name
-        {
-            get
-            {
-                return "RX: Extended Frequency Test";
-            }
-        }
-
-        public bool pass { get; private set; }
-
-        public bool testCompleted { get; private set; }
-
-        protected IBaseInstrument Instrument;
-
-        protected Action<string> LogCallback;
-
+        // Test-specific variables
         protected MotorolaXCMPRadioBase Radio;
-
         protected int StartFrequency;
         protected int EndFrequency;
         protected int StepFrequency;
 
-        public MotorolaXCMPRadio_TestRX_ExtendedFreq(XCMPRadioTestParams testParams)
+        public MotorolaXCMPRadio_TestRX_ExtendedFreq(XCMPRadioTestParams testParams) : base("RX: Extended Frequency Test", testParams.report, testParams.instrument, testParams.callback, testParams.ct)
         {
-            LogCallback = testParams.callback;
             Radio = testParams.radio;
-            Instrument = testParams.instrument;
             StartFrequency = testParams.ExtendedTestStart;
             EndFrequency = testParams.ExtendedTestEnd;
             StepFrequency = testParams.ExtendedTestStep;
         }
 
-        public bool isRadioEligible()
+        public override bool IsRadioEligible()
         {
             return true;
         }
 
-        public async Task setup()
+        public override async Task Setup()
         {
-            LogCallback(String.Format("Setting up for {0}", name));
+            LogCallback(String.Format("Setting up for {0}", Name));
             await Instrument.SetDisplay(InstrumentScreen.Generate);
-            await Task.Delay(1000);
+            await Task.Delay(1000, Ct);
             await Instrument.SetupRXTestFMMod();
-            await Task.Delay(1000);
+            await Task.Delay(1000, Ct);
         }
 
-        public async Task performTest()
+        public override async Task PerformTest()
         {
             try
             {
@@ -60,26 +42,28 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     Radio.SetReceiveConfig(XCMPRadioReceiveOption.CSQ);
                     Radio.SetRXFrequency(i, false);
                     await Instrument.SetTxFrequency(i);
-                    await Task.Delay(5000);
+                    await Task.Delay(5000, Ct);
                     await Instrument.GenerateSignal(-47);
-                    await Task.Delay(5000);
-                    byte[] rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI);
+                    await Task.Delay(5000, Ct);
+                    byte rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI)[0];
                     await Instrument.StopGenerating();
-                    LogCallback(String.Format("Measured RSSI at {0}MHz: {1}", (i / 1000000D), rssi[0]));
+                    Report.AddResult(OpenAutoBench.ResultType.RSSI, rssi, 150, 150, 255, i);
+                    LogCallback(String.Format("Measured RSSI at {0}MHz: {1}", (i / 1000000D), rssi));
 
 
                     if (Instrument.SupportsP25)
                     {
                         Radio.SetReceiveConfig(XCMPRadioReceiveOption.STD_1011);
                         await Instrument.SetupRXTestP25BER();
-                        await Task.Delay(1000);
+                        await Task.Delay(1000, Ct);
                         await Instrument.GenerateP25STDCal(-116);
-                        await Task.Delay(5000);
-                        string BER = Radio.GetP25BER(4);
+                        await Task.Delay(5000, Ct);
+                        double BER = Radio.GetP25BER(4);
                         await Instrument.StopGenerating();
-                        LogCallback(String.Format("Measured BER at {0}MHz: {1}", (i / 1000000D), BER));
+                        Report.AddResult(OpenAutoBench.ResultType.BIT_ERROR_RATE, (float)BER, 0.0f, 0.0f, 1.0f, i);
+                        LogCallback(String.Format("Measured BER at {0}MHz: {1}%", (i / 1000000D), BER));
                         await Instrument.SetupRXTestFMMod();
-                        await Task.Delay(1000);
+                        await Task.Delay(1000, Ct);
                     }
                     else
                     {
@@ -90,18 +74,14 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             }
             catch (Exception ex)
             {
+                Report.AddError(OpenAutoBench.ResultType.RSSI, ex.ToString());
                 LogCallback(String.Format("Test failed: {0}", ex.ToString()));
                 throw new Exception("Test failed.", ex);
             }
 
         }
 
-        public async Task performAlignment()
-        {
-            throw new NotImplementedException();
-        }
-
-        public async Task teardown()
+        public override async Task Teardown()
         {
             //
         }

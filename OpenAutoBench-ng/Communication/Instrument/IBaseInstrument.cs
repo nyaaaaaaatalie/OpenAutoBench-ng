@@ -7,8 +7,31 @@
         public bool SupportsP25 { get; }
 
         public bool SupportsDMR { get; }
+        
+        /// <summary>
+        /// Instrument Manufacturer
+        /// </summary>
+        public string Manufacturer { get; }
+        /// <summary>
+        /// Instrument Model
+        /// </summary>
+        public string Model { get; }
+        /// <summary>
+        /// Instrument Serial number
+        /// </summary>
+        public string Serial { get; }
+        /// <summary>
+        /// Instrument software/firmware version
+        /// </summary>
+        public string Version { get; }
+        /// <summary>
+        /// Time to wait after sending an instrument command to let the device configure itself
+        /// </summary>
+        public int ConfigureDelay { get; }
+
         public Task Connect();
         public Task Disconnect();
+        public Task<bool> TestConnection();
         public Task GenerateSignal(float power);
         public Task GenerateFMSignal(float power, float afFreq);
 
@@ -26,7 +49,7 @@
 
         public Task<float> MeasureFMDeviation();
 
-        public Task<string> GetInfo();
+        public Task<bool> GetInfo();
 
         public Task Reset();
 

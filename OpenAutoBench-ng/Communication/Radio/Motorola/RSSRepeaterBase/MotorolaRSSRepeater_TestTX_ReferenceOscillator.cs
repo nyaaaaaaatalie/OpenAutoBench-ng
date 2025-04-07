@@ -5,51 +5,30 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
 {
     public class MotorolaRSSRepeater_TestTX_ReferenceOscillator : IBaseTest
     {
-        public string name
-        {
-            get
-            {
-                return "TX: Reference Oscillator";
-            }
-        }
-
-        public bool pass { get; private set; }
-
-        public bool testCompleted { get; private set; }
-
-        private IBaseInstrument Instrument;
-
-        private Action<string> LogCallback;
-
-        private MotorolaRSSRepeaterBase Repeater;
-
         // private vars specific to test
-
+        private MotorolaRSSRepeaterBase Repeater;
         private int TXFrequency;
-
         private int tolerance = 50;    // absolute hz
 
-        public MotorolaRSSRepeater_TestTX_ReferenceOscillator(MotorolaRSSRepeaterBaseTestParams testParams)
+        public MotorolaRSSRepeater_TestTX_ReferenceOscillator(MotorolaRSSRepeaterBaseTestParams testParams) : base("TX: Reference Oscillator", testParams.report, testParams.instrument, testParams.callback, testParams.ct)
         {
-            LogCallback = testParams.callback;
             Repeater = testParams.radio;
-            Instrument = testParams.instrument;
         }
 
-        public bool isRadioEligible()
+        public override bool IsRadioEligible()
         {
             return true;
         }
 
-        public async Task setup()
+        public override async Task Setup()
         {
-            LogCallback(String.Format("Setting up for {0}", name));
+            LogCallback(String.Format("Setting up for {0}", Name));
             await Instrument.SetDisplay(InstrumentScreen.Monitor);
             await Repeater.SetShell(MotorolaRSSRepeaterBase.Shell.RSS);
             TXFrequency = await Repeater.GetTxFrequency();
         }
 
-        public async Task performTest()
+        public override async Task PerformTest()
         {
             await performTestWithReturn();
         }
@@ -61,13 +40,15 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
             {
                 await Instrument.SetRxFrequency(TXFrequency);
                 Repeater.Keyup();
-                await Task.Delay(5000);
+                await Task.Delay(5000, Ct);
                 measErr = await Instrument.MeasureFrequencyError();
                 measErr = (float)Math.Round(measErr, 2);
+                Report.AddResult(OpenAutoBench.ResultType.REF_OSC, measErr, TXFrequency, TXFrequency - 50, TXFrequency + 50, TXFrequency);
                 LogCallback(String.Format("Measured frequency error at {0}MHz: {1}hz", (TXFrequency / 1000000D), measErr));
             }
             catch (Exception ex)
             {
+                Report.AddError(OpenAutoBench.ResultType.REF_OSC, ex.ToString());
                 LogCallback(String.Format("Test failed: {0}", ex.ToString()));
                 throw new Exception("Test failed.", ex);
             }
@@ -79,10 +60,10 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
             return measErr;
         }
 
-        public async Task performAlignment()
+        public override async Task PerformAlignment()
         {
             float last = await performTestWithReturn();
-            await Task.Delay(300);
+            await Task.Delay(300, Ct);
 
             int maxStepSize = 32;  // As you set
             int stepSize = maxStepSize;
@@ -102,12 +83,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
                 int step = last > 0 ? stepSize : -stepSize;
 
                 await StepPend(step);
-                await Task.Delay(500);
+                await Task.Delay(500, Ct);
                 last = await performTestWithReturn();
-                await Task.Delay(500);
+                await Task.Delay(500, Ct);
             }
         }
-
 
         public async Task StepPend(int step)
         {
@@ -132,10 +112,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
             string dir = step < 0 ? "UP" : "DN";
 
             await Repeater.Send($"AL PEND {dir} {Math.Abs(step)}");
-            await Task.Delay(300);
+            await Task.Delay(300, Ct);
         }
-
-
 
         public async Task WritePend(int pendValue)
         {
@@ -150,7 +128,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
             return int.Parse(pend);
         }
 
-        public async Task teardown()
+        public override async Task Teardown()
         {
             //
         }

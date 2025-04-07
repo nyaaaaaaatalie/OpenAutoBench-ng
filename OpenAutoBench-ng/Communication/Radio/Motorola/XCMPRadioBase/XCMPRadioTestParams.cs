@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.ObjectPool;
 using OpenAutoBench_ng.Communication.Instrument;
+using OpenAutoBench_ng.OpenAutoBench;
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 {
@@ -24,6 +25,12 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         public IBaseInstrument? instrument;
         public Action<string>? callback;
         public MotorolaXCMPRadioBase? radio;
+
+        // Cancellation token for stopping tests
+        public CancellationToken ct;
+
+        // Test report object for recording test results
+        public TestReport report;
 
         public XCMPRadioTestParams()
         {

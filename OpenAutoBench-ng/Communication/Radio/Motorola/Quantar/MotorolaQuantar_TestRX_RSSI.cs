@@ -5,50 +5,29 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.Quantar
 {
     public class MotorolaQuantar_TestRX_RSSI : IBaseTest
     {
-        public string name
-        {
-            get
-            {
-                return "RX: RSSI";
-            }
-        }
-
-        public bool pass { get; private set; }
-
-        public bool testCompleted { get; private set; }
-
-        private IBaseInstrument Instrument;
-
-        private Action<string> LogCallback;
-
+        // private vars specific to test
         protected MotorolaQuantar Repeater;
-
+        private int RXFrequency;
         private int GenLevel = -90;
 
-        // private vars specific to test
-
-        private int RXFrequency;
-
-        public MotorolaQuantar_TestRX_RSSI(MotorolaRSSRepeaterBaseTestParams testParams)
+        public MotorolaQuantar_TestRX_RSSI(MotorolaRSSRepeaterBaseTestParams testParams) : base("RX: RSSI", testParams.report, testParams.instrument, testParams.callback, testParams.ct)
         {
-            LogCallback = testParams.callback;
             Repeater = (MotorolaQuantar)testParams.radio;
-            Instrument = testParams.instrument;
         }
 
-        public bool isRadioEligible()
+        public override bool IsRadioEligible()
         {
             return true;
         }
 
-        public async Task setup()
+        public override async Task Setup()
         {
             await Instrument.SetDisplay(InstrumentScreen.Generate);
             await Repeater.Transmit("SET FREQ TX 0");
             RXFrequency = await Repeater.GetRxFrequency();
         }
 
-        public async Task performTest()
+        public override async Task PerformTest()
         {
             await Instrument.StopGenerating();
             await Instrument.SetTxFrequency(RXFrequency);
@@ -58,12 +37,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.Quantar
             await Instrument.StopGenerating();
         }
 
-        public async Task performAlignment()
-        {
-            throw new NotSupportedException();
-        }
-
-        public async Task teardown()
+        public override async Task Teardown()
         {
             //
         }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.FileSystemGlobbing.Internal;
 using OpenAutoBench_ng.Communication.Instrument.Connection;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace OpenAutoBench_ng.Communication.Instrument.Astronics_R8000
 {
@@ -13,6 +14,13 @@ namespace OpenAutoBench_ng.Communication.Instrument.Astronics_R8000
         public bool SupportsP25 { get { return true; } }
 
         public bool SupportsDMR { get { return false; } }
+
+        public string Manufacturer { get; private set; }
+        public string Model { get; private set; }
+        public string Serial { get; private set; }
+        public string Version { get; private set; }
+
+        public int ConfigureDelay { get { return 250; } }
 
         public Astronics_R8000Instrument(IInstrumentConnection conn)
         {
@@ -57,6 +65,12 @@ namespace OpenAutoBench_ng.Communication.Instrument.Astronics_R8000
             Connection.Disconnect();
         }
 
+        public async Task<bool> TestConnection()
+        {
+            // TODO: Implement this
+            Console.WriteLine("Connection test not yet implemented for instrument!");
+            return false;
+        }
         public async Task GenerateSignal(float power)
         {
             await Send($"SET RF:Output Level={power}");
@@ -129,9 +143,24 @@ namespace OpenAutoBench_ng.Communication.Instrument.Astronics_R8000
             return float.Parse(await Send("GET MONITOR:Deviation+"));
         }
 
-        public async Task<string> GetInfo()
+        public async Task<bool> GetInfo()
         {
-            return await Send("*IDN?");
+            // Get response from IDN which should be <company name>, <model number>, <serial number>, <firmware revision>
+            string idenResp = await Send("*IDN?");
+            try
+            {
+                string[] idenParams = idenResp.Split(',');
+                Manufacturer = idenParams[0];
+                Model = idenParams[1];
+                Serial = idenParams[2];
+                Version = idenParams[3];
+            }
+            catch (IndexOutOfRangeException)
+            {
+                Console.WriteLine("IDN response invalid!");
+                return false;
+            }
+            return true;
         }
 
         public async Task Reset()

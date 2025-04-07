@@ -12,6 +12,13 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 
         public bool SupportsDMR { get { return false; } }
 
+        public string Manufacturer { get; private set; }
+        public string Model { get; private set; }
+        public string Serial { get; private set; }
+        public string Version { get; private set; }
+
+        public int ConfigureDelay { get { return 250; } }
+
         private int GPIBAddr;
         public HP_8900Instrument(IInstrumentConnection conn, int addr)
         {
@@ -46,9 +53,40 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
             Connection.Disconnect();
         }
 
+        public async Task<bool> TestConnection()
+        {
+            // Connect if not already connected
+            if (!Connected)
+            {
+                await Connect();
+            }
+            // Test result
+            bool success = true;
+            // Get info
+            await GetInfo();
+            // Validate manufacturer
+            if (!Manufacturer.Contains("Hewlett-Packard"))
+            {
+                Console.WriteLine("Connected instrument is not an HP device!");
+                success = false;
+            }
+            // Validate model
+            string[] models = new string[] { "8920", "8921", "8935" };
+            if (!models.Any(Model.Contains))
+            {
+                Console.WriteLine("Connected instrument is not an 8920, 8921, or 8935!");
+                success = false;
+            }
+            // Close
+            await Disconnect();
+            // Return result
+            return success;
+        }
+
         public async Task GenerateSignal(float power)
         {
-            await Send("RFG:AMPL " + power.ToString());
+            await Transmit($"RFG:AMPL {power.ToString()} DBM");
+            await Transmit("RFG:AMPL:STAT 1");
         }
 
         public async Task GenerateFMSignal(float power, float afFreq)
@@ -59,7 +97,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 
         public async Task StopGenerating()
         {
-            await Send("RFG:AMPL:STAT 0");
+            await Transmit("RFG:AMPL:STAT 0");
         }
 
         public async Task SetGenPort(InstrumentOutputPort outputPort)
@@ -67,11 +105,11 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
             switch (outputPort)
             {
                 case InstrumentOutputPort.RF_IN_OUT:
-                    await Send("RFG:OUTP 'RF Out'");
+                    await Transmit("RFG:OUTP 'RF Out'");
                     break;
 
                 case InstrumentOutputPort.DUPLEX_OUT:
-                    await Send("RFG:OUTP DUPL");
+                    await Transmit("RFG:OUTP DUPL");
                     break;
             }
         }
@@ -83,7 +121,8 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 
         public async Task SetTxFrequency(int frequency)
         {
-            await Send("RFG:FREQ " + frequency.ToString());
+            // Does not return anything
+            await Transmit("RFG:FREQ " + frequency.ToString());
         }
 
         public async Task<float> MeasurePower()
@@ -101,25 +140,41 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
             return float.Parse(await Send("MEAS:AFR:FM?"));
         }
 
-        public async Task<string> GetInfo()
+        public async Task<bool> GetInfo()
         {
-            return await Send("*IDN?");
+            // Get response from IDN which should be <company name>, <model number>, <serial number>, <firmware revision>
+            string idenResp = await Send("*IDN?");
+            try
+            {
+                string[] idenParams = idenResp.Split(',');
+                Manufacturer = idenParams[0];
+                Model = idenParams[1];
+                Serial = idenParams[2];
+                Version = idenParams[3];
+            }
+            catch (IndexOutOfRangeException)
+            {
+                Console.WriteLine("IDN response invalid!");
+                return false;
+            }
+            return true;
         }
 
         public async Task Reset()
         {
-            await Send("*RST");
+            await Transmit("*RST");
         }
 
         public async Task SetDisplay(InstrumentScreen screen)
         {
             switch (screen)
             {
+                // These don't return anything, so we Transmit instead of Send
                 case InstrumentScreen.Monitor:
-                    await Send("DISP RFAN");
+                    await Transmit("DISP RFAN");
                     break;
                 case InstrumentScreen.Generate:
-                    await Send("DISP RFG");
+                    await Transmit("DISP RFG");
                     break;
                 default:
                     throw new Exception("Unknown screen requested");
@@ -175,7 +230,8 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 
         public async Task SetupRXTestFMMod()
         {
-            //Not implemented, but shouldn't raise an exception
+            // Ensure we're using the RF Out port
+            await SetGenPort(InstrumentOutputPort.RF_IN_OUT);
         }
 
         public async Task SetupRXTestP25BER()

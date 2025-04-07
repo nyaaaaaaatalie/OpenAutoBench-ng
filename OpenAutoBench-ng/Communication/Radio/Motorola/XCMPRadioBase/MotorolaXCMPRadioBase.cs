@@ -11,6 +11,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
     {
         public string Name { get; private set; }
 
+        public virtual string ModelName { get; private set; }
+
         public string SerialNumber { get; private set; }
 
         public string FirmwareVersion { get; private set; }
@@ -64,6 +66,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         {
             Name = "";
             SerialNumber = "";
+            ModelNumber = "";
             FirmwareVersion = "";
             InfoHeader = "";
             _connection = conn;
@@ -362,7 +365,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             throw new NotImplementedException();
         }
 
-        public string GetP25BER(int nbrFrames)
+        public double GetP25BER(int nbrFrames)
         {
             byte[] cmd = new byte[4];
 
@@ -407,10 +410,10 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         }
 
 
-        private static string CalculateP25BER(int nbrFrames, byte[] berReply)
+        private static double CalculateP25BER(int nbrFrames, byte[] berReply)
         {
             string noOfBitError = ""; // Stores the number of bit errors as a string.
-            string bitErrorPercentage = "Error"; // Default return value if calculation fails.
+            double errorPercentage = -1; // Default is negative 1 if calculation fails
 
             int chunks = berReply.Length / 5; // Each chunk in the byte array is 5 bytes long.
             int lastFrameNumber = 0; // Tracks the last valid frame number.
@@ -470,17 +473,16 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     // Calculate the bit error percentage.
                     double numerator = (double)(bitErrorCount * 100L); // Scale bit error count to percentage.
                     double denominator = (double)(nbrFrames * totalBitsPerFrame); // Total bits in all frames.
-                    double errorPercentage = numerator / denominator;
-
-                    // Format the error percentage to 4 decimal places.
-                    bitErrorPercentage = string.Format("{0:F4}%", errorPercentage);
+                    
+                    // Store the result
+                    errorPercentage = numerator / denominator;
                 }
 
                 currentIndex += 5; // Move to the next chunk.
                 chunks--; // Decrease the chunk count.
             }
 
-            return bitErrorPercentage;
+            return errorPercentage;
         }
 
         private static long Convert4ByteArraytoLong(byte byte1, byte byte2, byte byte3, byte byte4)

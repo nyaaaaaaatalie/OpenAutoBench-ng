@@ -1,85 +1,61 @@
 ﻿using OpenAutoBench_ng.Communication.Instrument;
 using OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase;
+using OpenAutoBench_ng.OpenAutoBench;
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 {
     public class MotorolaXCMPRadio_TestTX_ReferenceOscillator : IBaseTest
     {
-        public string name
-        {
-            get
-            {
-                return "TX: Reference Oscillator";
-            }
-        }
-
-        public bool pass { get; private set; }
-
-        public bool testCompleted { get; private set; }
-
-        protected IBaseInstrument Instrument;
-
-        protected Action<string> LogCallback;
-
-        protected MotorolaXCMPRadioBase Radio;
-
-        // private vars specific to test
-
+        // Test-specific variables
         protected int TXFrequency;
+        protected MotorolaXCMPRadioBase radio;
 
-        public MotorolaXCMPRadio_TestTX_ReferenceOscillator(XCMPRadioTestParams testParams)
+        public MotorolaXCMPRadio_TestTX_ReferenceOscillator(XCMPRadioTestParams testParams) : base("TX: Reference Oscillator", testParams.report, testParams.instrument, testParams.callback, testParams.ct)
         {
-            LogCallback = testParams.callback;
-            Radio = testParams.radio;
-            Instrument = testParams.instrument;
+            radio = testParams.radio;
         }
 
-        public bool isRadioEligible()
+        public override bool IsRadioEligible()
         {
             return true;
         }
 
-        public async Task setup()
+        public override async Task Setup()
         {
-            LogCallback(String.Format("Setting up for {0}", name));
+            // Setup measurement
+            LogCallback(String.Format("Setting up for {0}", Name));
             await Instrument.SetDisplay(InstrumentScreen.Monitor);
-            await Task.Delay(1000);
+            await Task.Delay(Instrument.ConfigureDelay, Ct);
             await Instrument.SetupRefOscillatorTest_P25();
-            await Task.Delay(1000);
-
-            // let child set frequency
+            await Task.Delay(Instrument.ConfigureDelay, Ct);
         }
 
-        public async Task performTest()
+        public override async Task PerformTest()
         {
             try
             {
-                Radio.SetTXFrequency(TXFrequency, false);
+                radio.SetTXFrequency(TXFrequency, false);
                 await Instrument.SetRxFrequency(TXFrequency);
-                Radio.Keyup();
-                await Task.Delay(5000);
+                radio.Keyup();
+                await Task.Delay(5000, Ct);
                 float measErr = await Instrument.MeasureFrequencyError();
                 measErr = (float)Math.Round(measErr, 2);
+                Report.AddResult(ResultType.REF_OSC, measErr, 0.0f, -50.0f, 50.0f, TXFrequency);
                 LogCallback(String.Format("Measured frequency error at {0}MHz: {1}hz", (TXFrequency / 1000000F), measErr));
             }
             catch (Exception ex)
             {
-                LogCallback(String.Format("Test failed: {0}", ex.ToString()));
-                throw new Exception("Test failed.", ex);
+                Report.AddError(ResultType.REF_OSC, ex.ToString());
+                LogCallback(String.Format("Test error: {0}", ex.ToString()));
+                throw new Exception("Test error:", ex);
             }
             finally
             {
-                Radio.Dekey();
+                radio.Dekey();
             }
-
         }
 
-        public async Task performAlignment()
-        {
-            throw new NotImplementedException();
-        }
-
-        public async Task teardown()
+        public override async Task Teardown()
         {
             //
         }
