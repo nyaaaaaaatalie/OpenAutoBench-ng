@@ -22,7 +22,7 @@
             <br />
             <input type="checkbox" @bind="testParams.doPowerTest" /> Tx: Power
             <br />
-            <input type="checkbox" @bind="testParams.doDeviationTest" /> Tx: Deviation
+            <input type="checkbox" @bind="testParams.doDeviationTest" /> Tx: Deviation Balance
             <br />
             <input type="checkbox" @bind="testParams.doTxBer" /> Tx: BER
             <br />
@@ -99,7 +99,7 @@
     private Preferences prefs = new Preferences();
     private Settings settings;
 
-    private TestReport report = new TestReport();
+    private TestReport report = new TestReport(ReportType.TEST);
 
     // Token to cancel a test in progress
     private bool testInProgress = false;
@@ -181,7 +181,7 @@
             {
                 await Connect();
 
-                report = new TestReport();
+                report = new TestReport(ReportType.ALIGNMENT);
                 report.Start(instrument, radio);
 
                 ctSource.Token.ThrowIfCancellationRequested();
@@ -266,7 +266,7 @@
             {
                 await Connect();
 
-                report = new TestReport();
+                report = new TestReport(ReportType.TEST);
                 report.Start(instrument, radio);
 
                 ctSource.Token.ThrowIfCancellationRequested();

@@ -221,6 +221,9 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
             //Partially implemented, the filters are being set-up, but other settings may need to be added.
             await Transmit("AFAN:FILT1 '<20Hz HPF'");
             await Transmit("AFAN:FILT2 '15kHz LPF'");
+            // Set up FM deviation averaging
+            await Transmit("MEAS:AFR:FM:AVER:STAT ON");
+            await Transmit("MEAS:AFR:FM:AVER:VAL 5");
         }
 
         public async Task SetupTXP25BERTest()

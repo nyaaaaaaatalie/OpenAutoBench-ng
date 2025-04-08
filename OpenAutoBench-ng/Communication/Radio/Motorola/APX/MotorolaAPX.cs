@@ -54,7 +54,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
 
             await Task.Delay(1000, testParams.ct);
 
-            if (testParams.doTxBer)
+            if (testParams.instrument.SupportsP25 && testParams.doTxBer)
             {
                 MotorolaAPX_TestTX_P25_BER test = new MotorolaAPX_TestTX_P25_BER(testParams);
                 await test.Setup();
@@ -78,7 +78,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
 
             await Task.Delay(1000, testParams.ct);
 
-            if (testParams.doRxBer)
+            if (testParams.instrument.SupportsP25 && testParams.doRxBer)
             {
                 MotorolaAPX_TestRX_P25_BER test = new MotorolaAPX_TestRX_P25_BER(testParams);
                 await test.Setup();
@@ -117,6 +117,18 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
             if (testParams.doRefoscTest)
             {
                 MotorolaAPX_TestTX_ReferenceOscillator test = new MotorolaAPX_TestTX_ReferenceOscillator(testParams);
+                await test.Setup();
+                await test.PerformAlignment();
+                await test.Teardown();
+            }
+
+            testParams.ct.ThrowIfCancellationRequested();
+
+            await Task.Delay(1000, testParams.ct);
+
+            if (testParams.doDeviationTest)
+            {
+                MotorolaAPX_TestTX_DeviationBalance test = new MotorolaAPX_TestTX_DeviationBalance(testParams);
                 await test.Setup();
                 await test.PerformAlignment();
                 await test.Teardown();

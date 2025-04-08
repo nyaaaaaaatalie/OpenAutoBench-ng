@@ -59,7 +59,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public override async Task PerformAlignment()
         {
-            LogCallback("Starting RefOsc alignment routine");
+            LogCallback("Starting Reference Oscillator alignment routine");
 
             try
             {
@@ -72,6 +72,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     10.0,                               // most instruments should be able to maintain accuracy to within +/- 10 Hz
                     new Range<double>(-10000, 10000),   // +/- 10kHz seems reasonable
                     new PIDGains(-1.0, 0.0, 0.0),       // note negative feedback required
+                    500,                                // Wait 500ms for each measurement
                     20,
                     LogCallback,
                     Ct

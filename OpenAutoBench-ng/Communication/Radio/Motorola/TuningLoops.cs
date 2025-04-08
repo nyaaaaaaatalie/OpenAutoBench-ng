@@ -81,6 +81,9 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             // Moving average for error measurement
             private OABMath.MovingAverage errAvg = new OABMath.MovingAverage(5);
 
+            // Minimum iterations
+            private int minIterations = 3;
+
             // Iteration delay (ms)
             private int iterDelay = 500;
 
@@ -90,19 +93,25 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             /// <summary>
             /// Create a new softpot tuning loop
             /// </summary>
+            /// <param name="radio">The radio to tune</param>
             /// <param name="softpotType">softpot to adjust</param>
             /// <param name="measFunc">function which returns the measurement</param>
             /// <param name="measTarget">target measurement value</param>
             /// <param name="measTolerance">measurement +/- tolerance</param>
             /// <param name="measRange">Expected range of the measurement value</param>
+            /// <param name="gains">PID loop gains</param>
+            /// <param name="loopTime">Time to wait after each measurement loop, in ms</param>
             /// <param name="timeout">tuning routine timeout in seconds</param>
-            public SoftpotTuningLoop(MotorolaXCMPRadioBase radio, MotorolaXCMPRadioBase.SoftpotType softpotType, Func<Task<float>> measFunc, double measTarget, double measTolerance, CSPID.Range<double> measRange, PIDGains gains, uint timeout, Action<string> logCallback, CancellationToken ct)
+            /// <param name="logCallback">Logging string callback</param>
+            /// <param name="ct">Cancellation token</param>
+            public SoftpotTuningLoop(MotorolaXCMPRadioBase radio, MotorolaXCMPRadioBase.SoftpotType softpotType, Func<Task<float>> measFunc, double measTarget, double measTolerance, CSPID.Range<double> measRange, PIDGains gains, int loopTime, uint timeout, Action<string> logCallback, CancellationToken ct)
             {
                 Radio = radio;
                 SoftpotType = softpotType;
                 MeasFunc = measFunc;
                 MeasTarget = measTarget;
                 MeasTolerance = measTolerance;
+                iterDelay = loopTime;
                 timeOut = timeout * 1000;
                 this.gains = gains;
                 LogCallback = logCallback;
@@ -162,6 +171,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
                 byte[] softpotBytes = Radio.SoftpotGetValue(SoftpotType);
                 double softpotValue = spBytesToVal(softpotBytes);
 
+                LogCallback($"Starting softpot value for {SoftpotName}: {softpotValue}");
+
                 // Initial measurement & error
                 double measurement = 0;
                 double error = 0;
@@ -182,7 +193,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
                     errAvg.Add(Math.Abs(error));
 
                     // Exit loop if we achieved our target
-                    if (errAvg.Value <= MeasTolerance)
+                    if (errAvg.Value <= MeasTolerance && i >= minIterations)
                     {
                         // Debug print
                         Console.WriteLine($"Softpot tuning loop for {SoftpotName} hit threshold of <= {MeasTolerance:F3}, exiting tune loop!");

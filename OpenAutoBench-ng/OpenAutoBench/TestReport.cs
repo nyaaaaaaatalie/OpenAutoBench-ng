@@ -14,6 +14,12 @@ using OpenAutoBench_ng.OpenAutoBench.Fonts;
 
 namespace OpenAutoBench_ng.OpenAutoBench
 {
+    public enum ReportType
+    {
+        TEST,
+        ALIGNMENT
+    }
+
     public enum ResultType
     {
         REF_OSC,
@@ -211,7 +217,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
             if ((TargetValue - LowerLimit) == (UpperLimit - TargetValue))
             {
                 // Show +/- same value
-                return $"+/-{(UpperLimit - TargetValue)}";
+                return $"±{(UpperLimit - TargetValue)}";
             }
             else
             {
@@ -228,6 +234,9 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
     public class TestReport
     {
+        // Report type
+        public ReportType Type { get; private set; }
+
         // Report start & end time
         public DateTime StartTime { get; private set; }
         public DateTime EndTime { get; private set; }
@@ -259,13 +268,15 @@ namespace OpenAutoBench_ng.OpenAutoBench
         // Report Comments
         public string Comments { get; set; }
 
-        public TestReport()
+        public TestReport(ReportType type)
         {
+            Type = type;
             // Default values
             IsOpen = false;
             IsFinished = false;
             Results = new List<TestResult>();
             Errors = new List<TestError>();
+            Type = type;
         }
 
         /// <summary>
@@ -462,7 +473,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
                         gfx = XGraphics.FromPdfPage(page);
                         line = margin;
                         // Headers
-                        gfx.DrawString($"OpenAutoBench-NG v{Assembly.GetExecutingAssembly().GetName().Version.ToString()}", headerFont, XBrushes.Black, margin, line, XStringFormats.BottomLeft);
+                        gfx.DrawString($"OpenAutoBench-NG v{Assembly.GetExecutingAssembly().GetName().Version.ToString()} {reportType()}", headerFont, XBrushes.Black, margin, line, XStringFormats.BottomLeft);
                         gfx.DrawString($"{EndTime.ToString()}", headerFont, XBrushes.Black, page.Width - margin, line, XStringFormats.BottomRight);
                         line += (2 * lineHeight);
                         // Table header
@@ -532,6 +543,18 @@ namespace OpenAutoBench_ng.OpenAutoBench
             else
             {
                 return Result.FAIL;
+            }
+        }
+
+        private string reportType()
+        {
+            if (Type == ReportType.ALIGNMENT)
+            {
+                return "Auto-Align Report";
+            }
+            else
+            {
+                return "Test Report";
             }
         }
     }
