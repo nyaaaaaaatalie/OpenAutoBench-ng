@@ -8,6 +8,9 @@ using PdfSharpCore.Drawing.Layout;
 using System.Reflection;
 using OpenAutoBench_ng.Pages.Tests;
 using OpenAutoBench_ng.Communication.Radio.Motorola.APX;
+using PdfSharpCore.Fonts;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
+using OpenAutoBench_ng.OpenAutoBench.Fonts;
 
 namespace OpenAutoBench_ng.OpenAutoBench
 {
@@ -60,19 +63,19 @@ namespace OpenAutoBench_ng.OpenAutoBench
         /// <summary>
         /// Target measurement value
         /// </summary>
-        public float TargetValue { get; }
+        public double TargetValue { get; }
         /// <summary>
         /// Lower limit of acceptable measurement
         /// </summary>
-        public float LowerLimit { get; }
+        public double LowerLimit { get; }
         /// <summary>
         /// Upper limit of acceptable measurement
         /// </summary>
-        public float UpperLimit { get; }
+        public double UpperLimit { get; }
         /// <summary>
         /// Measured value
         /// </summary>
-        public float MeasuredValue { get; private set; }
+        public double MeasuredValue { get; private set; }
         /// <summary>
         /// Time the result was measured
         /// </summary>
@@ -102,7 +105,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
         /// <param name="lowerLimit"></param>
         /// <param name="upperLimit"></param>
         /// <param name="measuredValue"></param>
-        public TestResult(ResultType type, float targetValue, float lowerLimit, float upperLimit, int frequency = -1)
+        public TestResult(ResultType type, double targetValue, double lowerLimit, double upperLimit, int frequency = -1)
         {
             Type = type;
             TargetValue = targetValue;
@@ -120,7 +123,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
         /// <param name="lowerLimit"></param>
         /// <param name="upperLimit"></param>
         /// <param name="frequency"></param>
-        public TestResult(ResultType type, float measurement, float targetValue, float lowerLimit, float upperLimit, int frequency = -1)
+        public TestResult(ResultType type, double measurement, double targetValue, double lowerLimit, double upperLimit, int frequency = -1)
         {
             Type = type;
             TargetValue = targetValue;
@@ -134,7 +137,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
         /// Make the test result measurement, recording the time of measurement
         /// </summary>
         /// <param name="measurement"></param>
-        public void Measure(float measurement)
+        public void Measure(double measurement)
         {
             MeasuredValue = measurement;
             MeasurementTime = DateTime.Now;
@@ -151,19 +154,19 @@ namespace OpenAutoBench_ng.OpenAutoBench
             {
                 case ResultType.REF_OSC:
                     return new string[] {
-                        "Reference Oscillator", $"{MeasuredValue} Hz", $"{TargetValue} Hz",
+                        "Reference Oscillator", $"{MeasuredValue:F2} Hz", $"{TargetValue:F2} Hz",
                         $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.FREQ_ERROR:
                     return new string[] {
-                        "Frequency Error", $"{MeasuredValue} Hz", $"{TargetValue} Hz",
+                        "Frequency Error", $"{MeasuredValue:F2} Hz", $"{TargetValue:F2} Hz",
                         $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.TX_POWER:
                     return new string[] {
-                        "Transmit Power", $"{MeasuredValue} W", $"{TargetValue} W",
+                        "Transmit Power", $"{MeasuredValue:F2} W", TargetValue > 0 ? $"{TargetValue:F2} W" : "N/A",
                         $"{toleranceString()} W", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.TX_DEVIATION:
                     return new string[] {
-                        "Transmit Deviation", $"{MeasuredValue} Hz", $"{TargetValue} Hz",
+                        "Transmit Deviation", $"{MeasuredValue:F3} Hz", $"{TargetValue:F3} Hz",
                         $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.TX_DEVIATION_BAL:
                     return new string[] {
@@ -171,7 +174,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
                         $"{toleranceString()} %", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.BIT_ERROR_RATE:
                     return new string[] {
-                        "Bit Error Rate (BER)", $"{MeasuredValue}%", $"{TargetValue}%",
+                        "Bit Error Rate (BER)", $"{MeasuredValue:F2}%", $"{TargetValue:F2}%",
                         $"{toleranceString()} %", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.RSSI:
                     return new string[] {
@@ -207,10 +210,17 @@ namespace OpenAutoBench_ng.OpenAutoBench
         {
             if ((TargetValue - LowerLimit) == (UpperLimit - TargetValue))
             {
+                // Show +/- same value
                 return $"+/-{(UpperLimit - TargetValue)}";
             }
             else
             {
+                // Show +/+ if both limits are above target
+                if (TargetValue - LowerLimit < 0)
+                {
+                    return $"+{(UpperLimit - TargetValue)}/+{(TargetValue - LowerLimit)}";
+                }
+                // Show +/- different values
                 return $"+{(UpperLimit - TargetValue)}/-{(TargetValue - LowerLimit)}";
             }
         }
@@ -245,6 +255,9 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
         // List of test errors
         public List<TestError> Errors { get; private set; }
+
+        // Report Comments
+        public string Comments { get; set; }
 
         public TestReport()
         {
@@ -302,7 +315,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
         /// <param name="lowerLimit"></param>
         /// <param name="upperLimit"></param>
         /// <param name="frequency"></param>
-        public void AddResult(ResultType type, float measurement, float targetValue, float lowerLimit, float upperLimit, int frequency = -1)
+        public void AddResult(ResultType type, double measurement, double targetValue, double lowerLimit, double upperLimit, int frequency = -1)
         {
             TestResult result = new TestResult(type, measurement, targetValue, lowerLimit, upperLimit, frequency);
             AddResult(result);
@@ -350,6 +363,10 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
         public PdfDocument GeneratePDFReport()
         {
+            // Configure font resolver
+            if (GlobalFontSettings.FontResolver is not FontResolver)
+                GlobalFontSettings.FontResolver = new FontResolver();
+
             // Create document and section
             PdfDocument doc = new PdfDocument();
             PdfPage page = doc.AddPage();
@@ -361,11 +378,12 @@ namespace OpenAutoBench_ng.OpenAutoBench
             XGraphics gfx = XGraphics.FromPdfPage(page);
 
             // Font Setup
-            XFont headerFont = new XFont("Jost ExtraBold", 12);
-            XFont bodyFont = new XFont("Jost", 11);
-            XFont monoFont = new XFont("Cascadia Mono", 10);
+            XFont headerFont = new XFont("Jost", 12, XFontStyle.Bold);
+            XFont bodyFont = new XFont("OpenSans", 10, XFontStyle.Regular);
+            XFont bodyBoldFont = new XFont("OpenSans", 10, XFontStyle.Bold);
+            XFont monoFont = new XFont("RobotoMono", 10, XFontStyle.Regular);
 
-            int lineHeight = headerFont.Height;
+            int lineHeight = bodyFont.Height;
 
             // Page Setup
             int margin = 50; // Margin around the text
@@ -374,10 +392,10 @@ namespace OpenAutoBench_ng.OpenAutoBench
             int pageNumber = 1;
 
             // Left Header
-            gfx.DrawString($"OpenAutoBench-NG v{Assembly.GetExecutingAssembly().GetName().Version.ToString()}", headerFont, XBrushes.Black, margin, line);
+            gfx.DrawString($"OpenAutoBench-NG v{Assembly.GetExecutingAssembly().GetName().Version.ToString()}", headerFont, XBrushes.Black, margin, line, XStringFormats.BottomLeft);
 
             // Right Header
-            gfx.DrawString($"{EndTime.ToString()}", headerFont, XBrushes.Black, page.Width, line, XStringFormats.BottomRight);
+            gfx.DrawString($"{EndTime.ToString()}", headerFont, XBrushes.Black, page.Width - margin, line, XStringFormats.BottomRight);
 
             // Footer page number
             gfx.DrawString($"{pageNumber}", bodyFont, XBrushes.Black, page.Width / 2, page.Height - margin, XStringFormats.TopCenter);
@@ -385,30 +403,35 @@ namespace OpenAutoBench_ng.OpenAutoBench
             // Go down two lines
             line += (2 * lineHeight);
 
-            // Radio Information
+            // Radio Information Header & overall test results
             gfx.DrawString("Radio Information", headerFont, XBrushes.Black, margin, line);
+            gfx.DrawString($"Overall Test Result: {Enum.GetName(typeof(Result), overallTestResult())}", headerFont, XBrushes.Black, margin + 235, line);
             line += lineHeight;
-            gfx.DrawString("Model: ", bodyFont, XBrushes.Black, margin, line);
+            // Radio Model Name & Comments Header
+            gfx.DrawString("Model: ", bodyBoldFont, XBrushes.Black, margin, line);
             gfx.DrawString(Radio.ModelName, monoFont, XBrushes.Black, margin + 50, line);
+            gfx.DrawString("Report Comments:", bodyBoldFont, XBrushes.Black, margin + 235, line);
             line += lineHeight;
-            gfx.DrawString("Model #:", bodyFont, XBrushes.Black, margin, line);
+            // Radio Model # & Comment Box
+            gfx.DrawString("Model #:", bodyBoldFont, XBrushes.Black, margin, line);
             gfx.DrawString(Radio.ModelNumber, monoFont, XBrushes.Black, margin + 50, line);
+            XRect commentsBox = new XRect(margin + 235, line - (int)(lineHeight / 1.5), (page.Width - (2 * margin) - 235), lineHeight * 2);
+            gfx.DrawString(Comments != null ? Comments : "None", bodyFont, Comments != null ? XBrushes.Black : XBrushes.Gray, commentsBox, XStringFormats.TopLeft);
             line += lineHeight;
-            gfx.DrawString("Serial:", bodyFont, XBrushes.Black, margin, line);
+            // Radio Serial
+            gfx.DrawString("Serial:", bodyBoldFont, XBrushes.Black, margin, line);
             gfx.DrawString(Radio.SerialNumber, monoFont, XBrushes.Black, margin + 50, line);
 
-            // Overall Test Result
-            gfx.DrawString($"Overall Test Result: {Enum.GetName(typeof(Result), overallTestResult())}", headerFont, XBrushes.Black, margin + 235, line);
-
-            line += (2 * lineHeight);
+            // Skip a line
+            line += (int)(1.5 * lineHeight);
 
             // Table Headers
-            gfx.DrawString("Measurement", headerFont, XBrushes.Black, margin, line);
-            gfx.DrawString("Value", headerFont, XBrushes.Black, margin + 160, line);
-            gfx.DrawString("Target", headerFont, XBrushes.Black, margin + 235, line);
-            gfx.DrawString("Limits", headerFont, XBrushes.Black, margin + 305, line);
-            gfx.DrawString("Frequency", headerFont, XBrushes.Black, margin + 385, line);
-            gfx.DrawString("Result", headerFont, XBrushes.Black, margin + 475, line);
+            gfx.DrawString("Measurement", bodyBoldFont, XBrushes.Black, margin, line);
+            gfx.DrawString("Value", bodyBoldFont, XBrushes.Black, margin + 160, line);
+            gfx.DrawString("Target", bodyBoldFont, XBrushes.Black, margin + 235, line);
+            gfx.DrawString("Limits", bodyBoldFont, XBrushes.Black, margin + 305, line);
+            gfx.DrawString("Frequency", bodyBoldFont, XBrushes.Black, margin + 385, line);
+            gfx.DrawString("Result", bodyBoldFont, XBrushes.Black, margin + 475, line);
 
             line += (lineHeight / 2);
 
@@ -439,8 +462,8 @@ namespace OpenAutoBench_ng.OpenAutoBench
                         gfx = XGraphics.FromPdfPage(page);
                         line = margin;
                         // Headers
-                        gfx.DrawString($"{Radio.ModelName} - {Radio.ModelNumber} - {Radio.SerialNumber}", headerFont, XBrushes.Black, margin, line);
-                        gfx.DrawString($"{EndTime.ToString()}", headerFont, XBrushes.Black, page.Width, line, XStringFormats.BottomRight);
+                        gfx.DrawString($"OpenAutoBench-NG v{Assembly.GetExecutingAssembly().GetName().Version.ToString()}", headerFont, XBrushes.Black, margin, line, XStringFormats.BottomLeft);
+                        gfx.DrawString($"{EndTime.ToString()}", headerFont, XBrushes.Black, page.Width - margin, line, XStringFormats.BottomRight);
                         line += (2 * lineHeight);
                         // Table header
                         gfx.DrawString("Measurement", headerFont, XBrushes.Black, margin, line);

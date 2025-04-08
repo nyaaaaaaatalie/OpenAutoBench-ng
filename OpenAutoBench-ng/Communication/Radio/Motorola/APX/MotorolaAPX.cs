@@ -112,6 +112,17 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
             }
         }
 
+        public async Task PerformAlignments(XCMPRadioTestParams testParams)
+        {
+            if (testParams.doRefoscTest)
+            {
+                MotorolaAPX_TestTX_ReferenceOscillator test = new MotorolaAPX_TestTX_ReferenceOscillator(testParams);
+                await test.Setup();
+                await test.PerformAlignment();
+                await test.Teardown();
+            }
+        }
+
         public override int[] GetTXPowerPoints()
         {
             byte[] cmd = new byte[4];

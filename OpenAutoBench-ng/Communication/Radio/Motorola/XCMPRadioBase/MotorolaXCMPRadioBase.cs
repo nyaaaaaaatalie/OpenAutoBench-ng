@@ -1,4 +1,5 @@
-﻿using OpenAutoBench_ng.Communication.Radio.Motorola.Quantar;
+﻿using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
+using OpenAutoBench_ng.Communication.Radio.Motorola.Quantar;
 using System.IO.Ports;
 using System.Net;
 using System.Net.Http.Headers;
@@ -62,6 +63,58 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             ReadFrequency = 0x08,
         }
 
+        public enum SoftpotType : byte
+        {
+            RefOsc = 0x00,
+            TxPower = 0x01,
+            ModBalance = 0x02,
+            FrontendFilt1 = 0x03,
+            CurrentLimit = 0x04,
+            ModLimit = 0x05,
+            TempComp = 0x06,
+            TxPowerChar = 0x07,
+            BattCal = 0x08,
+            RFPABias1 = 0x09,
+            RFPABias2 = 0x0A,
+            RFPABias3 = 0x0B,
+            RFPABias4 = 0x0C,
+            FrontendFilt2 = 0x0D,
+            FrontendFilt3 = 0x0E,
+            RFPAGainCal = 0x0F,
+            RFPAGainCalPoint = 0x10,
+            TxPowerCharPoint = 0x11,
+            IntMicGain = 0x12,
+            ExtMicGain = 0x13,
+            TxIQBal = 0x14,
+            MaxTunedPwr = 0x15,
+            HPDRSSIComp = 0x16,
+            HPDRFPABias1 = 0x17,
+            HPDRFPABias2 = 0x18,
+            HPDRFPABias3 = 0x19,
+            HPDRFPABias4 = 0x1A,
+            HPDCurentLimit = 0x1B,
+            HPDTxPower = 0x1C,
+            HPDPhaseComp = 0x1D,
+            HPDAmpComp = 0x1E,
+            RxAttComp = 0x1F,
+            FrontEndGain = 0x20,
+            StepAtten = 0x21,
+            Volume = 0x22,
+            PwrCtrlAttOff = 0x23,
+            DACn = 0x24,
+            IntTempADC = 0x25,
+            BattVoltADC = 0x26,
+            PAVoltLimit = 0x27,
+            PAMaxIset = 0x28,
+            PwrCtrlBattParam = 0x29,
+            BattVoltCutSlope = 0x2A,
+            LowPortMod = 0x2B,
+            PASatRef = 0x2C,
+            SpurSetting = 0x2D,
+            IntRDAC = 0x2E,
+            RDACPwrChar = 0x2F,
+        }
+
         public MotorolaXCMPRadioBase(IXCMPRadioConnection conn)
         {
             Name = "";
@@ -104,7 +157,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
             Array.Copy(data, 0, toSend, 2, dataLen);
 
-            //Console.WriteLine("Sending " + Convert.ToHexString(toSend));
+            Console.WriteLine("Sending  " + Convert.ToHexString(toSend));
 
             _connection.Send(toSend);
 
@@ -114,10 +167,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             while (DateTime.UtcNow - startTime < TimeSpan.FromSeconds(5))
             {
                 byte[] fromRadio = _connection.Receive();
+
                 int len = 0;
 
                 len |= (fromRadio[0] << 8) & 0xFF;
                 len |= fromRadio[1];
+
+                Console.WriteLine("Received " + Convert.ToHexString(fromRadio.Take(len + 2).ToArray()));
 
                 byte[] retval = new byte[len];
 
@@ -283,41 +339,175 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             Send(cmd);
         }
 
-        public void SoftpotRead(int id)
+        /// <summary>
+        /// Get the current value of a softpot
+        /// </summary>
+        /// <param name="type">softpot type</param>
+        /// <returns>The bytes representing the softpot value (variable length)</returns>
+        public byte[] SoftpotGetValue(SoftpotType type)
         {
             byte[] cmd = new byte[4];
 
             // receive opcode
             cmd[0] = 0x00;
             cmd[1] = 0x01;
+            // read operation
+            cmd[2] = (byte)SoftpotOperation.Read;
+            // softpot type
+            cmd[3] = (byte)type;
 
-            cmd[2] = 0x00;
+            // Send and get response
+            byte[] resp = Send(cmd);
 
-            cmd[3] = (byte) id;
+            // Make sure we were successful
+            if (resp[2] != 0x00)
+            {
+                throw new InvalidDataException("Softpot read command did not return SUCCESS!");
+            }
 
-            Send(cmd);
+            // Validate type is the same
+            if (resp[4] != (byte)type)
+            {
+                throw new InvalidDataException($"Did not receive softpot type we asked for! {resp[4]} != {type}");
+            }
+
+            // Get value (remaining bytes in array)
+            byte[] value = resp.Skip(5).ToArray();
+            return value;
         }
-        public void SoftpotWrite(int id, int val)
+
+        /// <summary>
+        /// Get the maximum value for a softpot
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidDataException"></exception>
+        public byte[] SoftpotGetMinimum(SoftpotType type)
         {
-            throw new NotImplementedException();
+            byte[] cmd = new byte[4];
+
+            // softpot opcode 0x0001
+            cmd[0] = 0x00;
+            cmd[1] = 0x01;
+            // operation
+            cmd[2] = (byte)SoftpotOperation.ReadMin;
+            // softpot type
+            cmd[3] = (byte)type;
+
+            // Send
+            byte[] resp = Send(cmd);
+
+            // Make sure we were successful
+            if (resp[2] != 0x00)
+            {
+                throw new InvalidDataException("Softpot read command did not return SUCCESS!");
+            }
+
+            // Validate type is the same
+            if (resp[4] != (byte)type)
+            {
+                throw new InvalidDataException($"Did not get min softpot type we asked for! {resp[4]} != {type}");
+            }
+
+            // Get value (remaining bytes in array)
+            byte[] value = resp.Skip(5).ToArray();
+            return value;
         }
 
-        public void SoftpotUpdate(int id, int val)
+        /// <summary>
+        /// Get the minimum value for a softpot
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidDataException"></exception>
+        public byte[] SoftpotGetMaximum(SoftpotType type)
         {
-            byte[] cmd = new byte[6];
+            byte[] cmd = new byte[4];
+
+            // Softpot opcode 0x0001
+            cmd[0] = 0x00;
+            cmd[1] = 0x01;
+            // Operation
+            cmd[2] = (byte)SoftpotOperation.ReadMax;
+            // Softpot type
+            cmd[3] = (byte)type;
+
+            // Send
+            byte[] resp = Send(cmd);
+
+            // Make sure we were successful
+            if (resp[2] != 0x00)
+            {
+                throw new InvalidDataException("Softpot get max command did not return SUCCESS!");
+            }
+
+            // Validate type is the same
+            if (resp[4] != (byte)type)
+            {
+                throw new InvalidDataException($"Did not receive softpot type we asked for! {resp[4]} != {type}");
+            }
+
+            // Get value (remaining bytes in array)
+            byte[] value = resp.Skip(5).ToArray();
+            return value;
+        }
+
+        /// <summary>
+        /// Write a softpot value to radio
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="val"></param>
+        /// <exception cref="InvalidDataException"></exception>
+        public void SoftpotWrite(SoftpotType type, byte[] val)
+        {
+            byte[] cmd = new byte[4 + val.Length];
+
+            // Softpot opcode
+            cmd[0] = 0x00;
+            cmd[1] = 0x01;
+            // operation
+            cmd[2] = (byte)SoftpotOperation.Write;
+            // Type
+            cmd[3] = (byte)type;
+            // Value
+            Buffer.BlockCopy(val, 0, cmd, 4, val.Length);
+
+            // Send
+            byte[] resp = Send(cmd);
+
+            // Make sure we were successful
+            if (resp[2] != 0x00)
+            {
+                throw new InvalidDataException($"Softpot write command did not return SUCCESS! (Got {resp[2]})");
+            }
+        }
+
+        /// <summary>
+        /// Temporarily update a softpot value (will not persist, make sure to write)
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="val"></param>
+        public void SoftpotUpdate(SoftpotType type, byte[] val)
+        {
+            byte[] cmd = new byte[4 + val.Length];
 
             // receive opcode
             cmd[0] = 0x00;
             cmd[1] = 0x01;
 
-            cmd[2] = 0x02;
+            cmd[2] = (byte)SoftpotOperation.Update;
 
-            cmd[3] = (byte)id;
+            cmd[3] = (byte)type;
 
-            cmd[4] = (byte)((byte) (val >> 8) & 0xFF);
-            cmd[5] = (byte) (val & 0xFF);
+            Buffer.BlockCopy(val, 0, cmd, 4, val.Length);
 
-            Send(cmd);
+            byte[] resp = Send(cmd);
+
+            // Make sure we were successful
+            if (resp[2] != 0x00)
+            {
+                throw new InvalidDataException($"Softpot update command did not return SUCCESS! (Got {resp[2]})");
+            }
         }
 
         public virtual int[] GetTXPowerPoints()

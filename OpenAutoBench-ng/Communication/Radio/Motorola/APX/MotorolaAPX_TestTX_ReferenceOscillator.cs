@@ -1,4 +1,6 @@
-﻿using OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase;
+﻿using CSPID;
+using OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase;
+using OpenAutoBench_ng.OpenAutoBench;
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
 {
