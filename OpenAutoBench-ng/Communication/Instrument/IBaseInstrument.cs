@@ -10,13 +10,13 @@
         public Task Connect();
         public Task Disconnect();
         public Task GenerateSignal(float power);
-        public Task GenerateFMSignal(float power, float afFreq);
+        public Task GenerateFMSignal(float power, int frequency);
 
         public Task StopGenerating();
 
         public Task SetGenPort(InstrumentOutputPort outputPort);
 
-        public Task SetRxFrequency(int frequency);
+        public Task SetRxFrequency(int frequency, string mode);
 
         public Task SetTxFrequency(int frequency);
 
@@ -52,7 +52,7 @@
 
         public Task SetupRXTestP25BER();
 
-        public Task GenerateP25STDCal(float power);
+        public Task GenerateP25STDCal(float power, int frequency);
         
     }
 }

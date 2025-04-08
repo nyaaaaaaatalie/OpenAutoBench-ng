@@ -58,9 +58,7 @@ public class MotorolaXCMPRadio_TestRX_RSSI : IBaseTest
                 int currFreq = TXFrequencies[i];
                 Radio.SetReceiveConfig(XCMPRadioReceiveOption.CSQ);
                 Radio.SetRXFrequency(currFreq, false);
-                await Instrument.SetTxFrequency(currFreq);
-                await Task.Delay(5000);
-                await Instrument.GenerateSignal(-47); //For future version, this should be a customizable value
+                await Instrument.GenerateFMSignal(-50f, currFreq);
                 await Task.Delay(5000);
                 byte[] rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI);
                 await Instrument.StopGenerating();

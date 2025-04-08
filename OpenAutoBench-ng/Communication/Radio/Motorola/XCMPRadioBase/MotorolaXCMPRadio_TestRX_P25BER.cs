@@ -58,9 +58,8 @@ public class MotorolaXCMPRadio_TestRX_P25BER : IBaseTest
                 int currFreq = TXFrequencies[i];
                 Radio.SetReceiveConfig(XCMPRadioReceiveOption.STD_1011);
                 Radio.SetRXFrequency(currFreq, false);
-                await Instrument.SetTxFrequency(currFreq);
                 await Task.Delay(5000);
-                await Instrument.GenerateP25STDCal(-116); //For future version, this should be a customizable value
+                await Instrument.GenerateP25STDCal(-116, currFreq); //For future version, power should be a customizable value
                 await Task.Delay(5000);
                 string BER = Radio.GetP25BER(4);
                 await Instrument.StopGenerating();

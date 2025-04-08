@@ -15,8 +15,12 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
             _serialPort.BaudRate = baudrate;
             // set 5sec timeout
             _serialPort.ReadTimeout = 5000;
-            _serialPort.NewLine = "\n";
+            _serialPort.DataBits = 8;
+            _serialPort.Parity = Parity.None;
+            _serialPort.StopBits = StopBits.One;
             _serialPort.DtrEnable = true;
+            _serialPort.RtsEnable = true;
+
         }
 
         public void Connect()

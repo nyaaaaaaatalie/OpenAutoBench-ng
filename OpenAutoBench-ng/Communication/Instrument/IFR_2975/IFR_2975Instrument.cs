@@ -49,12 +49,13 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
             await Send("Generator PTT 1");
         }
 
-        public async Task GenerateFMSignal(float power, float afFreq)
+        public async Task GenerateFMSignal(float power, int frequency)
         {
-            //implementation to review
-            await GenerateSignal(power);
-            await Send("Generator MODulation 1");
+            await Send($"Generator FREQuency {frequency.ToString()} Hz");
+            await Task.Delay(1000);
             await Send($"Generator RFLEVel {power.ToString()}");
+            await Task.Delay(1000);
+            await Send("Generator PTT 1");
         }
             
 
@@ -68,9 +69,16 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
             await Send("Generator RFOUTput 0"); // Set Generator port to T/R
         }
 
-        public async Task SetRxFrequency(int frequency)
+        public async Task SetRxFrequency(int frequency, string mode)
         {
-            await Send($"Receiver FREQuency {frequency.ToString()} Hz");
+            if (mode == "ANALOG" || mode == "P25")
+            {
+                await Send($"Receiver FREQuency {frequency.ToString()} Hz");
+            }
+            else if (mode == "DMR")
+            {
+                throw new NotImplementedException("The IFR2975 does not support DMR.");
+            }
         }
 
         public async Task SetTxFrequency(int frequency)
@@ -211,8 +219,10 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
 
         }
 
-        public async Task GenerateP25STDCal(float power)
+        public async Task GenerateP25STDCal(float power, int frequency)
         {
+            await Send($"Generator FREQuency {frequency.ToString()} Hz");
+            await Task.Delay(1000);
             await Send($"Generator RFLEVel {power.ToString()}"); //Set Generator Power level
             await Task.Delay(1000);
             await Send("Generator PTT 1"); //Send signal

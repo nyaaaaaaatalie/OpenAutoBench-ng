@@ -50,9 +50,10 @@ namespace OpenAutoBench_ng.Communication.Instrument.Viavi_8800SX
             await Send($":gen:lvl:dbm {power}");
         }
 
-        public async Task GenerateFMSignal(float power, float afFreq)
+        public async Task GenerateFMSignal(float power, int frequency)
         {
-            throw new NotImplementedException();
+            await Transmit($":gen:freq {frequency / 1000000D}");
+            await Send($":gen:lvl:dbm {power}");
         }
 
         public async Task StopGenerating()
@@ -65,7 +66,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.Viavi_8800SX
             throw new NotImplementedException();
         }
 
-        public async Task SetRxFrequency(int frequency)
+        public async Task SetRxFrequency(int frequency, string mode)
         {
             await Transmit($":rec:freq {frequency / 1000000D}");
         }
@@ -164,7 +165,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.Viavi_8800SX
 
         }
 
-        public async Task GenerateP25STDCal(float power)
+        public async Task GenerateP25STDCal(float power, int frequency)
         {
             //Not implemented, but shouldn't raise an exception
         }

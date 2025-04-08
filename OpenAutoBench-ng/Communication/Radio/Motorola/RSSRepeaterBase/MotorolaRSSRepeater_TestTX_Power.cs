@@ -50,7 +50,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
         protected async Task<float> performTestWithReturn()
         {
             await Repeater.Send($"SET TX PWR {PA_PWR}");
-            await Instrument.SetRxFrequency(TXFrequency);
+            await Instrument.SetRxFrequency(TXFrequency, "FM");
             Repeater.Keyup();
             await Task.Delay(5000);
             float measPower = await Instrument.MeasurePower();

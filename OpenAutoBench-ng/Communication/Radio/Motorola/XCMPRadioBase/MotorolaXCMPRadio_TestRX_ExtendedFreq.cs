@@ -59,9 +59,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 {
                     Radio.SetReceiveConfig(XCMPRadioReceiveOption.CSQ);
                     Radio.SetRXFrequency(i, false);
-                    await Instrument.SetTxFrequency(i);
                     await Task.Delay(5000);
-                    await Instrument.GenerateSignal(-47);
+                    await Instrument.GenerateFMSignal(-50, i);
                     await Task.Delay(5000);
                     byte[] rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI);
                     await Instrument.StopGenerating();
@@ -72,14 +71,14 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     {
                         Radio.SetReceiveConfig(XCMPRadioReceiveOption.STD_1011);
                         await Instrument.SetupRXTestP25BER();
-                        await Task.Delay(1000);
-                        await Instrument.GenerateP25STDCal(-116);
+                        await Task.Delay(5000);
+                        await Instrument.GenerateP25STDCal(-116, i);
                         await Task.Delay(5000);
                         string BER = Radio.GetP25BER(4);
                         await Instrument.StopGenerating();
                         LogCallback(String.Format("Measured BER at {0}MHz: {1}", (i / 1000000D), BER));
                         await Instrument.SetupRXTestFMMod();
-                        await Task.Delay(1000);
+                        await Task.Delay(5000);
                     }
                     else
                     {
