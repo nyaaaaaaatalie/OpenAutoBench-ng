@@ -51,9 +51,8 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
             await Send("RFG:AMPL " + power.ToString());
         }
 
-        public async Task GenerateFMSignal(float power, int frequency)
+        public async Task GenerateFMSignal(float power)
         {
-            await Send("RFG:FREQ " + frequency.ToString());
             await Send("RFG:AMPL " + power.ToString());
         }
 
@@ -76,17 +75,17 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
             }
         }
 
-        public async Task SetRxFrequency(int frequency, string mode)
+        public async Task SetRxFrequency(int frequency, testMode mode)
         {
-            if (mode == "ANALOG")
+            if (mode == testMode.ANALOG)
             {
                 await Transmit(string.Format("RFAN:FREQ {0}", frequency.ToString()));
             }
-            else if (mode == "P25")
+            else if (mode == testMode.P25)
             {
                 throw new NotImplementedException("HP 8900 does not support digital tests.");
             }
-            else if (mode =="DMR")
+            else if (mode == testMode.DMR)
             {
                 throw new NotImplementedException("HP 8900 does not support digital tests.");
             }
@@ -195,7 +194,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 
         }
 
-        public async Task GenerateP25STDCal(float power, int frequency)
+        public async Task GenerateP25STDCal(float power)
         {
             throw new NotImplementedException("HP 8900 does not support digital tests.");
         }

@@ -76,11 +76,6 @@ namespace OpenAutoBench_ng.Communication.Instrument.Astronics_R8000
             await Task.Delay(500);
         }
 
-        public async Task GenerateFMSignal(float power, int frequency)
-        {
-            throw new NotImplementedException();
-        }
-
         public async Task GenerateP251011Signal(float power)
         {
             await Send("SET P25:Gen Test Pattern=1011 Hz Tone");
@@ -98,7 +93,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.Astronics_R8000
             throw new NotImplementedException();
         }
 
-        public async Task SetRxFrequency(int frequency, string mode)
+        public async Task SetRxFrequency(int frequency, testMode mode)
         {
             await Send($"SET RF:Monitor Frequency={frequency} Hz");
             // necessary to wait a little while or else it will return busy
@@ -211,7 +206,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.Astronics_R8000
 
         }
 
-        public async Task GenerateP25STDCal(float power, int frequency)
+        public async Task GenerateP25STDCal(float power)
         {
             //Not implemented, but shouldn't raise an exception
         }

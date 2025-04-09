@@ -13,6 +13,8 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         public bool SupportsDMR { get { return false; } }
 
+        private int txFreq;
+
         public GeneralDynamics_R2670Instrument(IInstrumentConnection conn, int addr)
         {
             Connected = false;
@@ -32,16 +34,19 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         public async Task GenerateSignal(float power)
         {
-            throw new NotImplementedException();
+            string freq = (txFreq / 1_000_000.0).ToString("F5");
+            string pwr = power.ToString("F1");
+            string str = "RG " + freq + ", 1, " + pwr + ", 1, 1\r";
+            await Transmit(str);
         }
 
-        public async Task GenerateFMSignal(float power, int frequency)
+       /* public async Task GenerateFMSignal(float power, int frequency)
         {
             string freq = (frequency / 1_000_000.0).ToString("F5");
             string pwr = power.ToString("F1");
             string str = "RG "+ freq+ ", 1, " + pwr + ", 1, 1\r";
             await Transmit(str);
-        }
+        } */
 
         public async Task StopGenerating()
         {
@@ -57,24 +62,23 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         public async Task SetRxFrequency(int frequency)
         {
-            string freq = (frequency / 1_000_000.0).ToString("F5");
-            await Transmit($"RM {freq} 1, 1, 1, 1\r");
+            
         }
 
-        public async Task SetRxFrequency(int frequency, string mode)
+        public async Task SetRxFrequency(int frequency, testMode mode)
         {
 
-            if (mode == "ANALOG")
+            if (mode == testMode.ANALOG)
             {
                 string freq = (frequency / 1_000_000.0).ToString("F5");
                 await Transmit($"RM {freq} 1, 1, 1, 1\r");
             }
-            else if (mode == "P25")
+            else if (mode == testMode.P25)
             {
                 string freq = (frequency / 1_000_000.0).ToString("F5");
                 await Transmit($"ARM {freq} 1, 1, 1\r");
             }
-            else if (mode == "DMR")
+            else if (mode == testMode.DMR)
             {
                 throw new NotImplementedException("R2670 does not support DMR.");
             }
@@ -82,8 +86,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         public async Task SetTxFrequency(int frequency)
         {
-            string freq = (frequency / 1_000_000.0).ToString("F5");
-            await Transmit("");
+            txFreq = frequency;
         }
 
         public async Task<float> MeasurePower()
@@ -283,10 +286,10 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         }
 
-        public async Task GenerateP25STDCal(float power, int frequency)
+        public async Task GenerateP25STDCal(float power)
         {
             await Transmit("mode 5\r");
-            string freq = (frequency / 1_000_000.0).ToString("F5");
+            string freq = (txFreq / 1_000_000.0).ToString("F5");
             string pwr = power.ToString("F1");
             string str = "ARG " + freq + ", 1, " + pwr + ", 1\r";
             await Transmit(str);
