@@ -130,11 +130,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                         MotorolaXCMPRadioBase.SoftpotType.ModBalance,
                         () => measureDeviationBalance(measDevLow),
                         0.0,                                // target is 0% difference
-                        1.5,                                // 1.5% is our target and for older test equipment that's even tough to get
+                        1.0,                                // 1.5% is the Moto spec so 1.0 is our limit for success
                         new Range<double>(-25.0, 25.0),     // +/- 25% seems reasonable
                         new PIDGains(-0.2, 0.0, 0.0),       // SWAG value
-                        30,
-                        3000,                               // Wait 3 seconds for each measurement
+                        2000,                               // Wait 2 seconds for each measurement
+                        30,                                 // 30 second tuning loop timeout
                         LogCallback,
                         Ct
                     );
@@ -170,7 +170,9 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     // Dekey
                     Radio.Dekey();
 
-                    await Task.Delay(500, Ct);
+                    // Let the radio rest for 5 seconds
+                    LogCallback("Letting radio cooldown for 5sec...");
+                    await Task.Delay(5000, Ct);
                 }
             }
             catch (Exception ex)

@@ -357,7 +357,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
             reportText += $"| Radio: {Radio.ModelNumber,-23}                                                                       |\n";
             // Date
             reportText +=  "~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=\n";
-            reportText += $"| Report Start: {StartTime,-16}  | End: {EndTime,16}  | Duration: {Duration.ToString(@"hh\:mm\:ss")}                  |\n";
+            reportText += $"| Report Start: {StartTime,-16}  | End: {EndTime,16}  | Duration: {Duration.ToString(@"hh\:mm\:ss")}                 |\n";
             // Table Header
             reportText +=  "~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=\n";
             reportText += $"| {"Measurement Type",-34}{"Value",-12}{"Target",-12}{"Limits",-12}{"Frequency",-16}{"Result",-8}       |\n";

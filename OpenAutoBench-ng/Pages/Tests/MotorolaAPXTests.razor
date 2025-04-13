@@ -73,19 +73,19 @@
     var testOutput = document.getElementById("test-output");
 
     // Callback to monitor the code text box for auto-scroll
-    const scrollCallback = (mutationList, observer) => {
-    for (const mutation of mutationList)
-    {
-    if (mutation.type === "childList")
-    {
-    testOutput.scrollTop = testOutput.scrollHeight;
-    }
-    }
+    function scrollCallback(mutationList, observer) {
+        for (const mutation of mutationList)
+        {
+            if (mutation.type === "childList")
+            {
+                testOutput.scrollTop = testOutput.scrollHeight;
+            }
+        }
     }
 
     // Create observer
     const config = { attributes: false, childList: true, subtree: true };
-    const observer = new MutationObserver(scrollCallback);
+    var observer = new MutationObserver(scrollCallback);
     observer.observe(testOutput, config)
 </script>
 

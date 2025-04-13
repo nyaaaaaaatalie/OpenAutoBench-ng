@@ -11,13 +11,15 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
 
         private SerialPort _serialPort { get; set; }
 
+        private int retries = 3;
+
         // opens an 115200 8n1 port without flow control
         public SerialConnection(string portName, int baudrate, Settings.SerialNewlineType delimeter = Settings.SerialNewlineType.LF, bool useDTR = false)
         {
             _serialPort = new SerialPort(portName);
             _serialPort.BaudRate = baudrate;
-            // set 5sec timeout
-            _serialPort.ReadTimeout = 5000;
+            // set 3sec timeout
+            _serialPort.ReadTimeout = 3000;
             switch (delimeter)
             {
                 case Settings.SerialNewlineType.LF:
@@ -54,10 +56,23 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
         /// <returns></returns>
         public async Task<string> Send(string toSend)
         {
-            await Transmit(toSend);
-            string data = await ReadLine();
-            Console.WriteLine($"Serial Receive: {data} ({BitConverter.ToString(Encoding.Default.GetBytes(data)).Replace("-", " ")}");
-            return data;
+            for (int i = 0; i < retries; i++)
+            {
+                // Send command
+                await Transmit(toSend);
+                // Try to read line
+                try
+                {
+                    string data = await ReadLine();
+                    Console.WriteLine($"Serial Receive: {data} ({BitConverter.ToString(Encoding.Default.GetBytes(data)).Replace("-", " ")}");
+                    return data;
+                }
+                catch (TimeoutException)
+                {
+                    Console.WriteLine($"Serial received attempt {i}/{retries} failed, retrying");
+                }
+            }
+            throw new TimeoutException($"Failed to get response to command {toSend} after {retries} retries!");
         }
 
         /// <summary>
