@@ -54,10 +54,10 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             try
             {
                 for (int i = 0; i < TXFrequencies.Length; i++)
-                {
+                {   
                     int currFreq = TXFrequencies[i];
                     Radio.SetTXFrequency(currFreq, false);
-                    await Instrument.SetRxFrequency(currFreq);
+                    await Instrument.SetRxFrequency(currFreq, testMode.ANALOG);
                     // low tone
                     Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_LOW);
                     Radio.Keyup();

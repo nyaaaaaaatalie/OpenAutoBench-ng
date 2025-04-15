@@ -60,7 +60,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 for (int i = 0; i < TXFrequencies.Length; i++)
                 {
                     Radio.SetTXFrequency(TXFrequencies[i], false);
-                    await Instrument.SetRxFrequency(TXFrequencies[i]);
+                    await Instrument.SetRxFrequency(TXFrequencies[i], testMode.ANALOG);
 
                     // low power
                     Radio.Keyup();

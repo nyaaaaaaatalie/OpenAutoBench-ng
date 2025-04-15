@@ -15,8 +15,12 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
             _serialPort.BaudRate = baudrate;
             // set 5sec timeout
             _serialPort.ReadTimeout = 5000;
-            _serialPort.NewLine = "\n";
-            _serialPort.DtrEnable = true;
+            _serialPort.DataBits = 8;
+            _serialPort.Parity = Parity.None;
+            _serialPort.StopBits = StopBits.One;
+            _serialPort.DtrEnable = true;//this is needed for R2670
+            _serialPort.RtsEnable = true;//this is needed for R2670
+
         }
 
         public void Connect()

@@ -49,12 +49,11 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
             await Send("Generator PTT 1");
         }
 
-        public async Task GenerateFMSignal(float power, float afFreq)
+        public async Task GenerateFMSignal(float power)
         {
-            //implementation to review
-            await GenerateSignal(power);
-            await Send("Generator MODulation 1");
             await Send($"Generator RFLEVel {power.ToString()}");
+            await Task.Delay(1000);
+            await Send("Generator PTT 1");
         }
             
 
@@ -68,9 +67,16 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
             await Send("Generator RFOUTput 0"); // Set Generator port to T/R
         }
 
-        public async Task SetRxFrequency(int frequency)
+        public async Task SetRxFrequency(int frequency, testMode mode)
         {
-            await Send($"Receiver FREQuency {frequency.ToString()} Hz");
+            if (mode == testMode.ANALOG || mode == testMode.P25)
+            {
+                await Send($"Receiver FREQuency {frequency.ToString()} Hz");
+            }
+            else if (mode == testMode.DMR)
+            {
+                throw new NotImplementedException("The IFR2975 does not support DMR.");
+            }
         }
 
         public async Task SetTxFrequency(int frequency)
