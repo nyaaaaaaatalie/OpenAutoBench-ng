@@ -32,7 +32,7 @@ jobs:
         with:
           name: rc2-daemon-${{ matrix.arch }}
           path: |
-            ${{ env.PUBLISH_PATH }}/OpenAutoBench-ng.exe
-            ${{ env.PUBLISH_PATH }}/OpenAutoBench-ng
-            ${{ env.PUBLISH_PATH }}/*.dll
+            ./output/OpenAutoBench-ng.exe
+            ./output/OpenAutoBench-ng
+            ./output/*.dll
           if-no-files-found: error
