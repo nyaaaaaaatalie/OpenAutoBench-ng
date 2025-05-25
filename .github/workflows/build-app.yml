@@ -31,8 +31,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: rc2-daemon-${{ matrix.arch }}
-          path: |
-            ./output/OpenAutoBench-ng.exe
-            ./output/OpenAutoBench-ng
-            ./output/*.dll
+          path: ./output/*
           if-no-files-found: error
