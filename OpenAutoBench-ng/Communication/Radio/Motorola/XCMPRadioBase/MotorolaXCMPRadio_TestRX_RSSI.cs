@@ -39,10 +39,12 @@ public class MotorolaXCMPRadio_TestRX_RSSI : IBaseTest
                 Radio.SetReceiveConfig(XCMPRadioReceiveOption.CSQ);
                 Radio.SetRXFrequency(currFreq, false);
                 await Instrument.SetTxFrequency(currFreq);
+
                 await Task.Delay(5000, Ct);
                 await Instrument.GenerateSignal(-47); //For future version, this should be a customizable value
                 await Task.Delay(5000, Ct);
                 byte rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI)[0];
+
                 await Instrument.StopGenerating();
                 Report.AddResult(OpenAutoBench.ResultType.RSSI, (float)rssi, 150, 150, 255, currFreq);
                 LogCallback(String.Format("Measured RSSI at {0}MHz: {1}", (currFreq / 1000000D), rssi));

@@ -33,6 +33,8 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
                     break;
             }
             _serialPort.DtrEnable = useDTR;
+            // _serialPort.RtsEnable = true;//this is needed for R2670
+
         }
 
         public void Connect()

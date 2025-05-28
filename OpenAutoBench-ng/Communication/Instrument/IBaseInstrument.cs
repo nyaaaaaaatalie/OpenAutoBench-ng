@@ -1,5 +1,12 @@
 ﻿namespace OpenAutoBench_ng.Communication.Instrument
 {
+    public enum testMode
+    {
+        ANALOG = 0x00,
+        P25 = 0x01,
+        DMR = 0x02,
+    }
+    
     public interface IBaseInstrument
     {
         public bool Connected { get; }
@@ -33,13 +40,12 @@
         public Task Disconnect();
         public Task<bool> TestConnection();
         public Task GenerateSignal(float power);
-        public Task GenerateFMSignal(float power, float afFreq);
 
         public Task StopGenerating();
 
         public Task SetGenPort(InstrumentOutputPort outputPort);
 
-        public Task SetRxFrequency(int frequency);
+        public Task SetRxFrequency(int frequency, testMode mode);
 
         public Task SetTxFrequency(int frequency);
 

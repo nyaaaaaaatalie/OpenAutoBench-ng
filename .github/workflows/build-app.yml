@@ -1,0 +1,35 @@
+name: Build App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        arch: [linux-x64, win-x64]
+    name: Build for ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        working-directory: ./OpenAutoBench-ng
+        run: dotnet publish -c Release -r ${{ matrix.arch }} --self-contained true -p:PublishSingleFile=true -o "./output/" "OpenAutoBench-ng.csproj"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openautobench-${{ matrix.arch }}
+          path: ./OpenAutoBench-ng/output/*
+          if-no-files-found: error

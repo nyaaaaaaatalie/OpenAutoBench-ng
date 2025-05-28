@@ -31,4 +31,7 @@ app.UseRouting();
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+
+Task.Run(async () => WebUILauncher.WaitAndLaunchWebUI());
+
 app.Run();

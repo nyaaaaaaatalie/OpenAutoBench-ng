@@ -33,7 +33,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
                 int TXFrequency = 0;
                 string result = await Repeater.Send($"AL TXDEV GO F{i}");
                 TXFrequency = Convert.ToInt32(result.Split(" = ")[1]);
-                await Instrument.SetRxFrequency(TXFrequency);
+                await Instrument.SetRxFrequency(TXFrequency, testMode.ANALOG);
                 
                 //Repeater.Keyup();     // sending GO will key the repeater up
                 await Task.Delay(5000, Ct);

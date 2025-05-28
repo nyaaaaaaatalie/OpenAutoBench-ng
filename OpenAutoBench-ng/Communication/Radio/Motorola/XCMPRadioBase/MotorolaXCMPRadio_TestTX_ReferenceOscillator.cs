@@ -27,9 +27,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             // Setup measurement
             LogCallback(String.Format("Setting up for {0}", Name));
             await Instrument.SetDisplay(InstrumentScreen.Monitor);
+
             await Task.Delay(Instrument.ConfigureDelay, Ct);
             await Instrument.SetupRefOscillatorTest_P25();
             await Task.Delay(Instrument.ConfigureDelay, Ct);
+
         }
 
         public override async Task PerformTest()
@@ -40,6 +42,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 await Instrument.SetRxFrequency(TXFrequency);
                 radio.Keyup();
                 await Task.Delay(5000, Ct);
+
                 float measErr = await Instrument.MeasureFrequencyError();
                 measErr = (float)Math.Round(measErr, 2);
                 Report.AddResult(ResultType.REF_OSC, measErr, 0.0, -freqErrMax, freqErrMax, TXFrequency);

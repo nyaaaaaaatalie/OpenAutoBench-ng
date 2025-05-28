@@ -4,6 +4,7 @@ using OpenAutoBench_ng.Communication.Instrument.Connection;
 using OpenAutoBench_ng.Communication.Instrument.HP_8900;
 using OpenAutoBench_ng.Communication.Instrument.IFR_2975;
 using System;
+using System.Text.RegularExpressions;
 using System.IO.Ports;
 using System.ComponentModel;
 using PdfSharpCore.Pdf;
@@ -13,6 +14,7 @@ using PdfSharpCore.Drawing;
 using PdfSharpCore.Drawing.Layout;
 using OpenAutoBench_ng.Communication.Instrument.Astronics_R8000;
 using OpenAutoBench_ng.Communication.Instrument.Viavi_8800SX;
+using OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670;
 
 namespace OpenAutoBench_ng.OpenAutoBench
 {
@@ -77,6 +79,34 @@ namespace OpenAutoBench_ng.OpenAutoBench
                         throw new Exception("Connection to instrument failed: " + e.ToString());
                     }
                     break;
+
+
+                case Settings.InstrumentTypeEnum.R2670:
+                    if (settings.IsGPIB)
+                    {
+                        throw new Exception("GPIB enabled and R2670 selected. GPIB is not supported on this instrument.");
+                    }
+                    int serialPort = 0;
+                    serialPort = int.Parse(Regex.Match(settings.InstrumentSerialPort, @"\d+").Value);
+                    instrument = new GeneralDynamics_R2670Instrument(connection, serialPort);
+                    await instrument.Connect();
+                    await Task.Delay(500);
+
+                    try
+                    {
+                        string instInfo = await instrument.GetInfo();
+                        if (!(instInfo.Length > 0))
+                        {
+                            throw new Exception("Get info succeeded but returned a zero length");
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        await instrument.Disconnect();
+                        throw new Exception("Connection to instrument failed: " + e.ToString());
+                    }
+                    break;
+
 
                 case Settings.InstrumentTypeEnum.IFR_2975:
                     if (settings.IsGPIB)
