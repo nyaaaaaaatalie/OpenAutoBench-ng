@@ -1,4 +1,7 @@
-﻿using System.IO.Ports;
+﻿using System.ComponentModel;
+using System.IO.Ports;
+using System.Text;
+using OpenAutoBench_ng.OpenAutoBench;
 
 namespace OpenAutoBench_ng.Communication.Instrument.Connection
 {
@@ -8,18 +11,29 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
 
         private SerialPort _serialPort { get; set; }
 
+        private int retries = 3;
+
         // opens an 115200 8n1 port without flow control
-        public SerialConnection(string portName, int baudrate, string delimeter = "\n")
+        public SerialConnection(string portName, int baudrate, Settings.SerialNewlineType delimeter = Settings.SerialNewlineType.LF, bool useDTR = false)
         {
             _serialPort = new SerialPort(portName);
             _serialPort.BaudRate = baudrate;
-            // set 5sec timeout
-            _serialPort.ReadTimeout = 5000;
-            _serialPort.DataBits = 8;
-            _serialPort.Parity = Parity.None;
-            _serialPort.StopBits = StopBits.One;
-            _serialPort.DtrEnable = true;//this is needed for R2670
-            _serialPort.RtsEnable = true;//this is needed for R2670
+            // set 3sec timeout
+            _serialPort.ReadTimeout = 3000;
+            switch (delimeter)
+            {
+                case Settings.SerialNewlineType.LF:
+                    _serialPort.NewLine = "\n";
+                    break;
+                case Settings.SerialNewlineType.CR:
+                    _serialPort.NewLine = "\r";
+                    break;
+                case Settings.SerialNewlineType.CRLF:
+                    _serialPort.NewLine = "\r\n";
+                    break;
+            }
+            _serialPort.DtrEnable = useDTR;
+            // _serialPort.RtsEnable = true;//this is needed for R2670
 
         }
 
@@ -44,8 +58,23 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
         /// <returns></returns>
         public async Task<string> Send(string toSend)
         {
-            await Transmit(toSend);
-            return await ReadLine();
+            for (int i = 0; i < retries; i++)
+            {
+                // Send command
+                await Transmit(toSend);
+                // Try to read line
+                try
+                {
+                    string data = await ReadLine();
+                    Console.WriteLine($"Serial Receive: {data} ({BitConverter.ToString(Encoding.Default.GetBytes(data)).Replace("-", " ")}");
+                    return data;
+                }
+                catch (TimeoutException)
+                {
+                    Console.WriteLine($"Serial received attempt {i}/{retries} failed, retrying");
+                }
+            }
+            throw new TimeoutException($"Failed to get response to command {toSend} after {retries} retries!");
         }
 
         /// <summary>
@@ -55,12 +84,24 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
         /// <returns></returns>
         public async Task Transmit(string toSend)
         {
+            Console.WriteLine($"Serial Transmit: {toSend} ({BitConverter.ToString(Encoding.Default.GetBytes(toSend)).Replace("-"," ")})");
             _serialPort.WriteLine(toSend);
         }
 
         public async Task<string> ReadLine()
         {
-            return _serialPort.ReadLine();
+            try
+            {
+                return _serialPort.ReadLine();
+            }
+            catch (TimeoutException)
+            {
+                byte[] buffer = new byte[_serialPort.BytesToRead];
+                _serialPort.Read(buffer, 0, _serialPort.BytesToRead);
+                Console.WriteLine($"Did not receive full serial line before timeout!");
+                Console.WriteLine($"    Bytes received: {Encoding.UTF8.GetString(buffer)} ({BitConverter.ToString(buffer).Replace("-"," ")})");
+                throw new TimeoutException();
+            }
         }
 
         public async Task TransmitByte(byte[] toSend)

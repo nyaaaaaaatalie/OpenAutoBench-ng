@@ -48,7 +48,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
             switch (settings.InstrumentConnectionType)
             {
                 case Settings.InstrumentConnectionTypeEnum.Serial:
-                    connection = new SerialConnection(settings.InstrumentSerialPort, settings.InstrumentBaudrate);
+                    connection = new SerialConnection(settings.InstrumentSerialPort, settings.InstrumentBaudrate, settings.AdapterNewline, settings.AdapterDTR);
                     break;
                 case Settings.InstrumentConnectionTypeEnum.IP:
                     connection = new IPConnection(settings.InstrumentIPAddress, settings.InstrumentIPPort);
@@ -71,11 +71,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
                     try
                     {
-                        string instInfo = await instrument.GetInfo();
-                        if (!(instInfo.Length > 0))
-                        {
-                            throw new Exception("Get info succeeded but returned a zero length");
-                        }
+                        await instrument.GetInfo();
                     }
                     catch (Exception e)
                     {
@@ -123,11 +119,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
                     try
                     {
-                        string instInfo = await instrument.GetInfo();
-                        if (!(instInfo.Length > 0))
-                        {
-                            throw new Exception("Get info succeeded but returned a zero length");
-                        }
+                        await instrument.GetInfo();
                     }
                     catch (Exception e)
                     {
@@ -152,11 +144,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
                     try
                     {
-                        string instInfo = await instrument.GetInfo();
-                        if (!(instInfo.Length > 0))
-                        {
-                            throw new Exception("Get info succeeded but returned a zero length");
-                        }
+                        await instrument.GetInfo();
                     }
                     catch (Exception e)
                     {
@@ -181,11 +169,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
                     try
                     {
-                        string instInfo = await instrument.GetInfo();
-                        if (!(instInfo.Length > 0))
-                        {
-                            throw new Exception("Get info succeeded but returned a zero length");
-                        }
+                        await instrument.GetInfo();
                     }
                     catch (Exception e)
                     {

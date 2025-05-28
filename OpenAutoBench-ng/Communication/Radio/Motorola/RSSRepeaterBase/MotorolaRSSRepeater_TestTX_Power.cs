@@ -5,67 +5,53 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
 {
     public class MotorolaRSSRepeater_TestTX_Power : IBaseTest
     {
-        public string name { get
-            {
-                return "TX: Power";
-            } }
-
-        public bool pass { get; private set; }
-
-        public bool testCompleted { get; private set; }
-
-        protected IBaseInstrument Instrument;
-
-        protected Action<string> LogCallback;
-
-        protected MotorolaRSSRepeaterBase Repeater;
-
         // private vars specific to test
-
+        protected MotorolaRSSRepeaterBase Repeater;
         private int TXFrequency;
-
         protected int PA_PWR = 0;
 
-        public MotorolaRSSRepeater_TestTX_Power(MotorolaRSSRepeaterBaseTestParams testParams)
+        public MotorolaRSSRepeater_TestTX_Power(MotorolaRSSRepeaterBaseTestParams testParams) : base("TX: Power", testParams.report, testParams.instrument, testParams.callback, testParams.ct)
         {
-            LogCallback = testParams.callback;
             Repeater = testParams.radio;
-            Instrument = testParams.instrument;
         }
 
-        public bool isRadioEligible()
+        public override bool IsRadioEligible()
         {
             return true;
         }
 
-        public async Task setup()
+        public override async Task Setup()
         {
             await Instrument.SetDisplay(InstrumentScreen.Monitor);
             TXFrequency = await Repeater.GetTxFrequency();
             await Repeater.Send("AL STNPWR RESET");
-            await Task.Delay(100);
+            await Task.Delay(100, Ct);
             PA_PWR = int.Parse(await Repeater.Get("GET PA ORD_PWR"));
         }
 
-        protected async Task<float> performTestWithReturn()
+        protected async Task<float> performTestWithReturn(bool record = false)
         {
             await Repeater.Send($"SET TX PWR {PA_PWR}");
             await Instrument.SetRxFrequency(TXFrequency, testMode.ANALOG);
             Repeater.Keyup();
-            await Task.Delay(5000);
+            await Task.Delay(5000, Ct);
             float measPower = await Instrument.MeasurePower();
             Repeater.Dekey();
             measPower = (float) Math.Round(measPower, 2);
+            if (record)
+            {
+                Report.AddResult(OpenAutoBench.ResultType.TX_POWER, measPower, PA_PWR, PA_PWR - 5, PA_PWR + 5, TXFrequency);
+            }
             LogCallback(String.Format("Measured power at {0}MHz: {1}w (expected {2}W)", (TXFrequency / 1000000D), measPower, PA_PWR));
             return measPower;
         }
 
-        public async Task performTest()
+        public override async Task PerformTest()
         {
-            await performTestWithReturn();
+            await performTestWithReturn(true);
         }
 
-        public async Task performAlignment()
+        public override async Task PerformAlignment()
         {
             // run 5 times
             for (int i = 0; i < 5; i++)
@@ -76,17 +62,18 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
                 double radioPower = Math.Round((double)(PA_PWR * 100));
                 LogCallback("Writing new power level to radio");
                 await Repeater.Send($"AL STNPWR WR {radioPower} {measPower}");
-                await Task.Delay(3000);
+                await Task.Delay(3000, Ct);
             }
 
             await Repeater.Send("AL STNPWR SAVE");
-            await Task.Delay(6000);
+            await Task.Delay(6000, Ct);
 
             float finalMeasPower = await performTestWithReturn();
+            Report.AddResult(OpenAutoBench.ResultType.TX_POWER, finalMeasPower, PA_PWR, PA_PWR + 5, PA_PWR - 5, TXFrequency);
             LogCallback($"Final measured power: {Math.Round(finalMeasPower, 2)}w");
         }
 
-        public async Task teardown()
+        public override async Task Teardown()
         {
             //
         }

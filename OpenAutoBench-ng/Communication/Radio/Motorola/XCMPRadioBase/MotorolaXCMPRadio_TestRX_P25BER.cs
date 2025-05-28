@@ -5,51 +5,30 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase;
 
 public class MotorolaXCMPRadio_TestRX_P25BER : IBaseTest
 {
-    public string name
-    {
-        get
-        {
-            return " RX: P25 BER Test";
-        }
-
-    }
-
-    public bool pass { get; private set; }
-
-    public bool testCompleted { get; private set; }
-
-    protected IBaseInstrument Instrument;
-
-    protected Action<string> LogCallback;
-
-    protected MotorolaXCMPRadioBase Radio;
-
     //private variables specific to the test
-
+    protected MotorolaXCMPRadioBase Radio;
     protected int[] TXFrequencies; //Technically these are "RX Frequencies for this test, but there's no harm done using the TX frequencies for testing the receiver Maybe we should rename this field to not make it TX Specific
 
-    public MotorolaXCMPRadio_TestRX_P25BER(XCMPRadioTestParams testParams)
+    public MotorolaXCMPRadio_TestRX_P25BER(XCMPRadioTestParams testParams) : base("RX: P25 BER Test", testParams.report, testParams.instrument, testParams.callback, testParams.ct)
     {
-        LogCallback = testParams.callback;
         Radio = testParams.radio;
-        Instrument = testParams.instrument;
     }
 
-    public bool isRadioEligible()
+    public override bool IsRadioEligible()
     {
         return true;
     }
 
-    public async Task setup()
+    public override async Task Setup()
     {
-        LogCallback(String.Format("Setting up for {0}", name));
+        LogCallback(String.Format("Setting up for {0}", Name));
         await Instrument.SetDisplay(InstrumentScreen.Generate);
-        await Task.Delay(1000);
+        await Task.Delay(1000, Ct);
         await Instrument.SetupRXTestP25BER();
-        await Task.Delay(1000);
+        await Task.Delay(1000, Ct);
     }
 
-    public async Task performTest()
+    public override async Task PerformTest()
     {
         try
         {
@@ -59,27 +38,24 @@ public class MotorolaXCMPRadio_TestRX_P25BER : IBaseTest
                 Radio.SetReceiveConfig(XCMPRadioReceiveOption.STD_1011);
                 Radio.SetRXFrequency(currFreq, false);
                 await Instrument.SetTxFrequency(currFreq);
-                await Task.Delay(5000);
+                await Task.Delay(5000, Ct);
                 await Instrument.GenerateP25STDCal(-116); //For future version, this should be a customizable value
-                await Task.Delay(5000);
-                string BER = Radio.GetP25BER(4);
+                await Task.Delay(5000, Ct);
+                double BER = Radio.GetP25BER(4);
                 await Instrument.StopGenerating();
-                LogCallback(String.Format("Measured BER at {0}MHz: {1}", (currFreq / 1000000D), BER));
+                Report.AddResult(OpenAutoBench.ResultType.BIT_ERROR_RATE, (float)BER, 0.0f, 0.0f, 1.0f, currFreq);
+                LogCallback(String.Format("Measured BER at {0}MHz: {1}%", (currFreq / 1000000D), BER));
             }
         }
         catch (Exception ex)
         {
+            Report.AddError(OpenAutoBench.ResultType.BIT_ERROR_RATE, ex.ToString());
             LogCallback(String.Format("Test failed: {0}", ex.ToString()));
             throw new Exception("Test failed.", ex);
         }
     }
 
-    public async Task performAlignment()
-    {
-        //RX Test No Aligment Possble
-    }
-
-    public async Task teardown()
+    public override async Task Teardown()
     {
         //
     }

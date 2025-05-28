@@ -2,13 +2,96 @@
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
 {
-    public class MotorolaAPX_Frequencies
+    public class MotorolaAPX_RefData
     {
+        public static string ModelName(MotorolaXCMPRadioBase radio)
+        {
+            /*
+             * Get Radio Model Name
+             */
+            string RadioModel = "Unknown";
+
+            // APX900
+            if (radio.ModelNumber.Contains("H92"))
+            {
+                RadioModel = "APX900";
+            }
+            // APX1000
+            else if (radio.ModelNumber.Contains("H84"))
+            {
+                RadioModel = "APX1000";
+            }
+            // APX2000
+            else if (radio.ModelNumber.Contains("H52"))
+            {
+                RadioModel = "APX2000";
+            }
+            // APX3000
+            else if (radio.ModelNumber.Contains("H59"))
+            {
+                RadioModel = "APX3000";
+            }
+            // APX4000
+            else if (radio.ModelNumber.Contains("H51"))
+            {
+                if (radio.ModelNumber.Contains("H51V"))
+                    RadioModel = "APX4000XH";
+                else
+                    RadioModel = "APX4000";
+            }
+            // APX6000
+            else if (radio.ModelNumber.Contains("H98"))
+            {
+                RadioModel = "APX6000";
+            }
+            // APX7000
+            else if (radio.ModelNumber.Contains("H49") ||
+                     radio.ModelNumber.Contains("H97"))
+            {
+                RadioModel = "APX7000";
+            }
+            // APX8000
+            else if (radio.ModelNumber.Contains("H98") ||
+                     radio.ModelNumber.Contains("H91"))
+            {
+                RadioModel = "APX8000";
+            }
+            // APX1500
+            else if (radio.ModelNumber.Contains("M36"))
+            {
+                RadioModel = "APX1500";
+            }
+            // APX4500
+            else if (radio.ModelNumber.Contains("M22"))
+            {
+                RadioModel = "APX4500";
+            }
+            // APX6500
+            else if (radio.ModelNumber.Contains("M25"))
+            {
+                RadioModel = "APX6500";
+            }
+            // APX7000
+            else if (radio.ModelNumber.Contains("M30"))
+            {
+                RadioModel = "APX7500";
+            }
+            // APX8500
+            else if (radio.ModelNumber.Contains("M37"))
+            {
+                RadioModel = "APX8500";
+            }
+
+            return RadioModel;
+        }
+
+        // Initialize data based on radio type
         public static int[] TxFrequencies(MotorolaXCMPRadioBase radio)
         {
+
             List<int> TxFrequencies = new List<int>();
             /*
-             * PORTABLES
+             * Portable Frequency Lists
              */
 
             //900 APX4000
@@ -170,7 +253,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
             }
 
             /*
-             * MULTIBAND PORTABLES
+             * Multiband Portable Frequencies
              */
 
             // APX7000
@@ -231,12 +314,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
             }
 
             // APX8000
-            else if (radio.ModelNumber.Contains("H91U"))
+            else if (radio.ModelNumber.Contains("H91U") ||
+                     radio.ModelNumber.Contains("H91T"))
             {
                 // VHF
                 TxFrequencies.Add(136012500);
-                TxFrequencies.Add(136012500);
-                TxFrequencies.Add(136012500);
+                TxFrequencies.Add(155012500);
+                TxFrequencies.Add(173987500);
 
                 // UHF
                 TxFrequencies.Add(380012500);
@@ -252,6 +336,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
                 TxFrequencies.Add(805987500);
                 TxFrequencies.Add(806012500);
                 TxFrequencies.Add(838012500);
+                //TxFrequencies.Add(851012500);
                 TxFrequencies.Add(869887500);
             }
 

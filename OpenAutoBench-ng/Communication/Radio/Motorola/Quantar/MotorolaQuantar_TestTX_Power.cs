@@ -11,11 +11,9 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.Quantar
         {
         }
 
-        
-
-        public async Task setup()
+        public override async Task Setup()
         {
-            await base.setup();
+            await base.Setup();
             await Repeater.Send("ALN STNPWR RESET");
             await Repeater.Send("SET TX PWR 100");
             

@@ -10,44 +10,88 @@
 
 <PageTitle>APX</PageTitle>
 
-<h3>Motorola APX</h3>
+<div class="d-flex flex-column h-100">
 
-<input type="checkbox" @bind="testParams.doRefoscTest" /> Tx: Reference Oscillator
-    <br />
-<input type="checkbox" @bind="testParams.doPowerTest" /> Tx: Power
-    <br />
-<input type="checkbox" @bind="testParams.doDeviationTest" /> Tx: Deviation
-    <br />
-<input type="checkbox" @bind="testParams.doTxBer" /> Tx: BER
-<br />
-<input type="checkbox" @bind="testParams.doRssiTest" /> Rx: RSSI
-    <br />
-<input type="checkbox" @bind="testParams.doRxBer" /> Rx: BER
-<br />
+    <h3 class="p-2">Motorola APX</h3>
 
-<div hidden="@(!settings.EnableExtendedFreqTest)">
-    <input type="checkbox" @bind="testParams.doTxExtendedTest" /> Tx: Extended Freq Test
-    <br />
-    <input type="checkbox" @bind="testParams.doRxExtendedTest" /> Rx: Extended Freq Test
-    <br />
-    <input type="text" @bind="testParams.ExtendedTestStart" /> Extended Freq Test Start (hz)
-    <br />
-    <input type="text" @bind="testParams.ExtendedTestEnd" /> Extended Freq Test End (hz)
-    <br />
-    <input type="text" @bind="testParams.ExtendedTestStep" /> Extended Freq Test Step (hz)
+    <div class="d-flex flex-row w-100">
+        <!-- Main Test Checkboxes -->
+        <div class="p-2">
+            <h5>Tests to Run</h5>
+            <input type="checkbox" @bind="testParams.doRefoscTest" /> Tx: Reference Oscillator
+            <br />
+            <input type="checkbox" @bind="testParams.doPowerTest" /> Tx: Power
+            <br />
+            <input type="checkbox" @bind="testParams.doDeviationTest" /> Tx: Deviation Balance
+            <br />
+            <input type="checkbox" @bind="testParams.doTxBer" /> Tx: BER
+            <br />
+            <input type="checkbox" @bind="testParams.doRssiTest" /> Rx: RSSI
+            <br />
+            <input type="checkbox" @bind="testParams.doRxBer" /> Rx: BER
+            <br />
+        </div>
+        <!-- Extended Text Checkboxes -->
+        <div class="p-2" hidden="@(!settings.EnableExtendedFreqTest)">
+            <h5>Extended Tests</h5>
+            <input type="checkbox" @bind="testParams.doTxExtendedTest" /> Tx: Extended Freq Test
+            <br />
+            <input type="checkbox" @bind="testParams.doRxExtendedTest" /> Rx: Extended Freq Test
+            <br />
+            <input type="text" @bind="testParams.ExtendedTestStart" /> Extended Freq Test Start (hz)
+            <br />
+            <input type="text" @bind="testParams.ExtendedTestEnd" /> Extended Freq Test End (hz)
+            <br />
+            <input type="text" @bind="testParams.ExtendedTestStep" /> Extended Freq Test Step (hz)
+        </div>
+        <!-- Test Comments -->
+        <div class="p-2 flex-grow-1">
+            <h5>Test Report Comments</h5>
+            <textarea class="form-control" @bind="report.Comments" rows="4"></textarea>
+        </div>
+    </div>
+
+    <!-- Test Buttons -->
+    <div class="p-2">
+        <button class="btn @(alignInProgress ? "btn-danger" : "btn-primary")" @onclick="@OnAlignButton" disabled=@(ctSource.IsCancellationRequested || testInProgress) >@(alignInProgress ? "Cancel Align" : "Begin Alignment")</button>
+
+        <button class="btn @(testInProgress ? "btn-danger" : "btn-success")" @onclick="@OnTestButton" disabled=@(ctSource.IsCancellationRequested || alignInProgress) >@(testInProgress ? "Cancel Test" : "Begin Test")</button>
+
+        <button class="btn btn-secondary" @onclick="@SavePDF" disabled=@(!report.IsFinished) >Save PDF</button>
+    </div>
+
+    <!-- Test Output -->
+    <div class="p-2 flex-grow-1 overflow-auto">
+        <div class="bg-secondary-subtle p-3 h-100 overflow-auto" id="test-output">
+            <pre><code>@((MarkupString)TestOutput)</code></pre>
+        </div>
+    </div>
+
 </div>
 
+<script>
+    var testOutput = document.getElementById("test-output");
 
-<button class="btn btn-primary" @onclick ="@OnAlnBegin">Begin Alignment</button>
-<button class="btn btn-secondary" @onclick ="@OnTestBegin">Begin Test</button>
+    // Callback to monitor the code text box for auto-scroll
+    function scrollCallback(mutationList, observer) {
+        for (const mutation of mutationList)
+        {
+            if (mutation.type === "childList")
+            {
+                testOutput.scrollTop = testOutput.scrollHeight;
+            }
+        }
+    }
 
-<button class="btn btn-success" @onclick="@SavePDF">Save PDF</button>
-<br />
+    // Create observer
+    const config = { attributes: false, childList: true, subtree: true };
+    var observer = new MutationObserver(scrollCallback);
+    observer.observe(testOutput, config)
+</script>
 
-<pre><code>@((MarkupString)TestOutput)</code></pre>
 @code {
     private string TestOutput = "Test output goes here...\n";
-    private bool NotConnected = true;
+    private bool Connected = false;
     private string[] ports;
     public XCMPRadioTestParams testParams = new XCMPRadioTestParams();
     IBaseInstrument instrument = null;
@@ -55,15 +99,21 @@
     private Preferences prefs = new Preferences();
     private Settings settings;
 
-    private async Task ConnectRadio()
+    private TestReport report = new TestReport(ReportType.TEST);
+
+    // Token to cancel a test in progress
+    private bool testInProgress = false;
+    private bool alignInProgress = false;
+    private CancellationTokenSource ctSource = new CancellationTokenSource();
+
+    private async Task Connect()
     {
         try
         {
             updateOutput("Connecting to test set...");
             instrument = await MainLogic.CreateInstrument();
-            await Task.Delay(500);
-            updateOutput("Connected to " + await instrument.GetInfo());
-
+            await Task.Delay(500, ctSource.Token);
+            updateOutput($"Connected to {instrument.Manufacturer} {instrument.Model} (S/N {instrument.Serial}, V {instrument.Version})");
         }
         catch (Exception e)
         {
@@ -77,9 +127,10 @@
             XCMPIPConnection conn = new XCMPIPConnection("192.168.128.1", 8002);
             radio = new MotorolaAPX(conn);
             radio.Connect();
-            await Task.Delay(500);
+            await Task.Delay(500, ctSource.Token);
             radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.SerialNumber);
-            updateOutput("Connected to " + radio.SerialNumber);
+            radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.ModelNumber);
+            updateOutput($"Connected to Motorola {radio.ModelNumber} (S/N {radio.SerialNumber})");
         }
         catch (Exception e)
         {
@@ -88,62 +139,187 @@
         }
 
         // allows tests to be run
-        NotConnected = false;
+        Connected = true;
     }
 
     private async Task OnConnect(MouseEventArgs mouseEventArgs)
     {
         clearOutput();
 
-        await ConnectRadio();
+        await Connect();
 
         await Task.Delay(1000);
 
         await instrument?.Disconnect();
+
         radio?.Disconnect();
-
     }
 
-    private async Task OnAlnBegin(MouseEventArgs mouseEventArgs)
+    private async Task OnAlignButton(MouseEventArgs mouseEventArgs)
     {
-    //
+        // Cancel if alignment is running
+        if (alignInProgress)
+        {
+            if (!ctSource.IsCancellationRequested)
+            {
+                ctSource.Cancel();
+            }
+        }
+        // Do nothing if test is running
+        else if (testInProgress)
+        {
+            return;
+        }
+        // Start a new alignment
+        else
+        {
+            alignInProgress = true;
+
+            clearOutput();
+
+            try
+            {
+                await Connect();
+
+                report = new TestReport(ReportType.ALIGNMENT);
+                report.Start(instrument, radio);
+
+                ctSource.Token.ThrowIfCancellationRequested();
+
+                updateOutput("Beginning alignment at " + report.StartTime.ToString("HH:mm:ss tt"));
+                updateOutput("=====================================");
+                updateOutput("");
+
+                // Setup test parameters
+                testParams.instrument = instrument;
+                testParams.callback = updateOutput;
+                testParams.radio = radio;
+                testParams.ct = ctSource.Token;
+                testParams.report = report;
+
+                ctSource.Token.ThrowIfCancellationRequested();
+
+                radio.EnterServiceMode();
+
+                await radio.PerformAlignments(testParams);
+            }
+            catch (OperationCanceledException e)
+            {
+                updateOutput("Alignment cancelled, closing connections");
+            }
+            catch (UnauthorizedAccessException e)
+            {
+                updateOutput($"Unable to access port! {e.ToString()}");
+            }
+            catch (Exception e)
+            {
+                updateOutput(String.Format("Error when aligning: {0}", e.ToString()));
+            }
+            finally
+            {
+                radio?.ResetRadio();
+                radio?.Disconnect();
+                await (instrument?.Disconnect() ?? Task.CompletedTask);
+                Connected = false;
+            }
+
+            report.End();
+
+            updateOutput("Completed alignment at " + report.EndTime.ToString("HH:mm:ss tt"));
+            updateOutput("Done in " + report.Duration.ToString(@"hh\:mm\:ss"));
+
+            updateOutput("");
+
+            updateOutput(report.GenerateTestReportString());
+
+            testInProgress = false;
+            // Recreate ct source to clear the cancel request
+            ctSource = new CancellationTokenSource();
+
+            alignInProgress = false;
+        }
     }
 
-    private async Task OnTestBegin(MouseEventArgs mouseEventArgs)
+    private async Task OnTestButton(MouseEventArgs mouseEventArgs)
     {
-        clearOutput();
-        DateTime startTime = DateTime.Now;
-
-        updateOutput("Beginning tests at " + startTime.ToString("HH:mm:ss tt"));
-        updateOutput("=====================================");
-        updateOutput("");
-
-        await ConnectRadio();
-
-        testParams.instrument = instrument;
-        testParams.callback = updateOutput;
-        testParams.radio = radio;
-        try
+        // Cancel if test running
+        if (testInProgress)
         {
-            radio.EnterServiceMode();
-            await radio.PerformTests(testParams);
+            if (!ctSource.IsCancellationRequested)
+            {
+                ctSource.Cancel();
+            }
         }
-        catch (Exception e)
+        // Do nothing if alignment is running
+        else if (alignInProgress)
         {
-            updateOutput(String.Format("Error when testing: {0}", e.ToString()));
+            return;
         }
-        finally
+        // Start a new test
+        else
         {
-            radio.ResetRadio();
-            radio.Disconnect();
-            await instrument.Disconnect();
+            testInProgress = true;
+
+            clearOutput();
+
+            try
+            {
+                await Connect();
+
+                report = new TestReport(ReportType.TEST);
+                report.Start(instrument, radio);
+
+                ctSource.Token.ThrowIfCancellationRequested();
+
+                updateOutput("Beginning tests at " + report.StartTime.ToString("HH:mm:ss tt"));
+                updateOutput("=====================================");
+                updateOutput("");
+
+                // Setup test parameters
+                testParams.instrument = instrument;
+                testParams.callback = updateOutput;
+                testParams.radio = radio;
+                testParams.ct = ctSource.Token;
+                testParams.report = report;
+
+                ctSource.Token.ThrowIfCancellationRequested();
+
+                radio.EnterServiceMode();
+
+                await radio.PerformTests(testParams);
+            }
+            catch (OperationCanceledException e)
+            {
+                updateOutput("Test cancelled, closing connections");
+            }
+            catch (UnauthorizedAccessException e)
+            {
+                updateOutput($"Unable to access port! {e.ToString()}");
+            }
+            catch (Exception e)
+            {
+                updateOutput(String.Format("Error when testing: {0}", e.ToString()));
+            }
+            finally
+            {
+                radio?.ResetRadio();
+                radio?.Disconnect();
+                await (instrument?.Disconnect() ?? Task.CompletedTask);
+                Connected = false;
+            }
+
+            report?.End();
+
+            updateOutput("Completed tests at " + report?.EndTime.ToString("HH:mm:ss tt"));
+            updateOutput("Done in " + report.Duration.ToString(@"hh\:mm\:ss"));
+
+            updateOutput("");
+            updateOutput(report.GenerateTestReportString());
+
+            testInProgress = false;
+            // Recreate ct source to clear the cancel request
+            ctSource = new CancellationTokenSource();
         }
-
-
-        DateTime endTime = DateTime.Now;
-        updateOutput("Completed tests at " + endTime.ToString("HH:mm:ss tt"));
-        TimeSpan timeDiff = endTime.Subtract(startTime);
-        updateOutput("Done in " + timeDiff.ToString(@"hh\:mm\:ss"));
     }
 
     public void updateOutput(string line)
@@ -166,9 +342,10 @@
 
     private async Task SavePDF()
     {
-        using (MemoryStream excelStream = MainLogic.GeneratePdf(TestOutput.Replace("<br>", "\n")))
+        using (MemoryStream excelStream = new MemoryStream())
         {
-            string fileName = $"TestReport - {radio?.SerialNumber}.pdf";
+            report.GeneratePDFReport().Save(excelStream, false);
+            string fileName = $"OAB-NG Report - {radio?.Name} {radio?.SerialNumber}.pdf";
             await JS.InvokeAsync<object>("saveAsFile", fileName, Convert.ToBase64String(excelStream.ToArray()));
         }
     }

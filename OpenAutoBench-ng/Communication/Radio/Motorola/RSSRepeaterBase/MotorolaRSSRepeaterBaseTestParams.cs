@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.ObjectPool;
 using OpenAutoBench_ng.Communication.Instrument;
+using OpenAutoBench_ng.OpenAutoBench;
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
 {
@@ -13,6 +14,10 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
         public IBaseInstrument? instrument;
         public Action<string>? callback;
         public MotorolaRSSRepeaterBase? radio;
+
+        public TestReport report;
+
+        public CancellationToken ct;
 
         public MotorolaRSSRepeaterBaseTestParams()
         {
