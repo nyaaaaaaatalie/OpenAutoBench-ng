@@ -94,8 +94,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
                     try
                     {
-                        string instInfo = await instrument.GetInfo();
-                        if (!(instInfo.Length > 0))
+                        if (!(await instrument.GetInfo()))
                         {
                             throw new Exception("Get info succeeded but returned a zero length");
                         }

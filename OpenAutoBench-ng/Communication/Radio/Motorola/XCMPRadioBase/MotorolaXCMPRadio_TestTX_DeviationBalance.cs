@@ -108,7 +108,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     LogCallback($"Starting deviation balance alignment for frequency {Frequency / 1E6:F5} MHz");
 
                     // Setup Instrument
-                    await Instrument.SetRxFrequency(Frequency);
+                    await Instrument.SetRxFrequency(Frequency, testMode.ANALOG);
 
                     // Wait for things to settle
                     await Task.Delay(500, Ct);
