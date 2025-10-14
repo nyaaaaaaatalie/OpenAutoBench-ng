@@ -1,4 +1,5 @@
 ﻿using OpenAutoBench_ng.Communication.Instrument.Connection;
+using OpenAutoBench_ng.OpenAutoBench;
 
 namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 {
@@ -19,9 +20,34 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 
         public int ConfigureDelay { get { return 250; } }
 
-        private int GPIBAddr;
+        private int GPIBAddr = -1;
+
+        /// <summary>
+        /// Initialize a new HP 8900 connection via VISA
+        /// </summary>
+        /// <param name=""></param>
+        public HP_8900Instrument(IInstrumentConnection conn)
+        {
+            // Ensure connection is of type VISA
+            if (conn.GetType() != typeof(VISAConnection))
+                throw new ArgumentException("HP 8900 VISA constructor requires VISA connection type");
+            // Save
+            Connected = false;
+            Connection = conn;
+        }
+
+        /// <summary>
+        /// Initializes a new HP 8900 connection via serial
+        /// </summary>
+        /// <param name="conn"></param>
+        /// <param name="addr"></param>
+        /// <exception cref="ArgumentException"></exception>
         public HP_8900Instrument(IInstrumentConnection conn, int addr)
         {
+            // Ensure connection is of type serial
+            if (conn.GetType() != typeof(SerialConnection))
+                throw new ArgumentException("HP 8900 serial constructor requires serial connection type");
+            // Save
             Connected = false;
             Connection = conn;
             GPIBAddr = addr;
@@ -40,16 +66,26 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
         public async Task Connect()
         {
             Connection.Connect();
-            await Transmit("++mode 1");
-            await Transmit("++addr " + GPIBAddr.ToString());
-            await Transmit("++auto 2");
-            await Transmit("++llo");
+            // Serial connect commands
+            if (Connection.GetType() == typeof(SerialConnection))
+            {
+                await Transmit("++mode 1");
+                await Transmit("++addr " + GPIBAddr.ToString());
+                await Transmit("++auto 2");
+                await Transmit("++llo");
+            }
+            // Either way, reset the instrument
+            Reset();
         }
 
         public async Task Disconnect()
         {
-            await Transmit("++loc");
-            await Transmit("++loc");
+            // Serial disconnect commands
+            if (Connection.GetType() == typeof(SerialConnection))
+            {
+                await Transmit("++loc");
+                await Transmit("++loc");
+            }
             Connection.Disconnect();
         }
 

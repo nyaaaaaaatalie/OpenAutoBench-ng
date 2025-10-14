@@ -3,8 +3,14 @@
 <PageTitle>Settings</PageTitle>
 
 @using OpenAutoBench_ng.OpenAutoBench
-@using OpenAutoBench_ng.Communication.Instrument
-@using Microsoft.Extensions.Logging
+@using OpenAutoBench_ng.Communication.Instrument;
+@using OpenAutoBench_ng.Communication.Instrument.Astronics_R8000;
+@using OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670;
+@using OpenAutoBench_ng.Communication.Instrument.HP_8900;
+@using OpenAutoBench_ng.Communication.Instrument.IFR_2975;
+@using OpenAutoBench_ng.Communication.Instrument.Viavi_8800SX;
+@using OpenAutoBench_ng.Communication.Instrument.Connection;
+@using Microsoft.Extensions.Logging;
 @inject ILogger<SettingsPage> Logger
 @inject IToastService toastService
 
@@ -22,41 +28,38 @@
     <DataAnnotationsValidator />
     <ValidationSummary />
 
+    <!-- Instrument Type Selection -->
     <p>
         <label>
-            Instrument Connection:
-            <InputSelect @bind-Value="settings.InstrumentConnectionType">
-                @foreach (var types in Enum.GetValues<Settings.InstrumentConnectionTypeEnum>())
+            Instrument Type:
+            <InputSelect @bind-Value="settings.InstrumentType">
+                @foreach (Settings.InstrumentTypeEnum inst in Enum.GetValues<Settings.InstrumentTypeEnum>())
                 {
-                    <option value="@types">@types</option>
+                    <option value="@inst">@inst</option>
                 }
             </InputSelect>
         </label>
     </p>
 
+    <!-- Instrument Connection Types depend on instrument selected -->
     <p>
         <label>
-            Instrument connected over GPIB?:
-            <InputCheckbox @bind-Value="settings.IsGPIB">
-            </InputCheckbox>
+            Instrument Connection:
+            <InputSelect @bind-Value="settings.InstrumentConnectionType">
+                @foreach (Settings.InstrumentConnectionTypeEnum type in Enum.GetValues(typeof(Settings.InstrumentConnectionTypeEnum)))
+                {
+                    <option value="@type">@(Enum.GetName<Settings.InstrumentConnectionTypeEnum>(type))</option>
+                }
+            </InputSelect>
         </label>
     </p>
 
-    <div hidden="@(!(settings.IsGPIB))">
-        <p>
-            <label>
-                Instrument GPIB Address:
-                <InputNumber @bind-Value="settings.InstrumentGPIBAddress">
-                </InputNumber>
-            </label>
-        </p>
-    </div>
-
-    <div hidden="@(!(settings.InstrumentConnectionType == Settings.InstrumentConnectionTypeEnum.Serial))">
+    <!-- Serial Specific Settings -->
+    <div hidden="@(settings.InstrumentConnectionType != Settings.InstrumentConnectionTypeEnum.Serial)">
         <p>
             <label>
                 Instrument Serial Port:
-                <InputSelect @bind-Value="settings.InstrumentSerialPort">
+                <InputSelect @bind-Value="settings.SerialPort">
                     @foreach (var port in ports)
                     {
                         <option value="@port">@port</option>
@@ -68,7 +71,7 @@
         <p>
             <label>
                 Instrument Baudrate:
-                <InputNumber @bind-Value="settings.InstrumentBaudrate">
+                <InputNumber @bind-Value="settings.SerialBaudrate">
                 </InputNumber>
             </label>
         </p>
@@ -76,7 +79,7 @@
         <p>
             <label>
                 Adapter Newline:
-                <InputSelect @bind-Value="settings.AdapterNewline">
+                <InputSelect @bind-Value="settings.SerialNewline">
                     @foreach (var types in Enum.GetValues<Settings.SerialNewlineType>())
                     {
                         <option value="@types">@types</option>
@@ -88,17 +91,36 @@
         <p>
             <label>
                 Use DTR:
-                <InputCheckbox @bind-Value="settings.AdapterDTR">
+                <InputCheckbox @bind-Value="settings.SerialDTR">
                 </InputCheckbox>
             </label>
         </p>
+
+        <p>
+            <label>
+                GPIB over Serial:
+                <InputCheckbox @bind-Value="settings.SerialIsGPIB">
+                </InputCheckbox>
+            </label>
+        </p>
+
+        <div hidden="@(!(settings.SerialIsGPIB))">
+            <p>
+                <label>
+                    Instrument GPIB Address:
+                    <InputNumber @bind-Value="settings.SerialGPIBAddress">
+                    </InputNumber>
+                </label>
+            </p>
+        </div>
     </div>
 
-    <div hidden="@(!(settings.InstrumentConnectionType == Settings.InstrumentConnectionTypeEnum.IP))">
+    <!-- IP Specific Settings -->
+    <div hidden="@(settings.InstrumentConnectionType != Settings.InstrumentConnectionTypeEnum.IP)">
         <p>
             <label>
                 Instrument IP Address:
-                <InputText @bind-Value="settings.InstrumentIPAddress">
+                <InputText @bind-Value="settings.IPAddress">
                 </InputText>
             </label>
         </p>
@@ -106,25 +128,28 @@
         <p>
             <label>
                 Instrument IP Port:
-                <InputNumber @bind-Value="settings.InstrumentIPPort">
+                <InputNumber @bind-Value="settings.IPPort">
                 </InputNumber>
             </label>
         </p>
     </div>
 
-    <p>
+    <!-- VISA Connection Settings -->
+    <div hidden="@(settings.InstrumentConnectionType != Settings.InstrumentConnectionTypeEnum.VISA)">
+        <p>
+            <label>
+                VISA Device:
+                <InputSelect @bind-Value="settings.VISAResourceName">
+                    @foreach (string resource in VISAConnection.GetInstrumentResources())
+                    {
+                        <option value="@resource">@resource</option>
+                    }
+                </InputSelect>
+            </label>
+        </p>
+    </div>
 
-        <label>
-            Instrument Type:
-            <InputSelect @bind-Value="settings.InstrumentType">
-                @foreach (var types in Enum.GetValues<Settings.InstrumentTypeEnum>())
-                {
-                    <option value="@types">@types</option>
-                }
-            </InputSelect>
-        </label>
-    </p>
-
+    <!-- Motorola ADK Keys for XCMP -->
     <p>
         <label><Tooltip Text="MotoTRBO ADK keys are property of Motorola Solutions and not included with this program. Specify in hex, with leading 0x.">MotoTRBO Keys:</Tooltip>
             <label>
@@ -154,7 +179,6 @@
             </InputText>
         </label>
     </p>
-
 
     <p>
         <label>

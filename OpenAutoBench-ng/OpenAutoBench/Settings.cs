@@ -22,6 +22,7 @@
             Serial = 0,
             //USB = 1,
             IP = 2,
+            VISA = 3,
         }
 
         public enum SerialNewlineType
@@ -37,33 +38,35 @@
         /// Bool to store if the instrument in question is on a GPIB bus.
         /// Pretty much just adds some specific commands for selecting the address
         /// </summary>
-        public bool IsGPIB { get; set; }
+        public bool SerialIsGPIB { get; set; }
 
         /// <summary>
         /// The address of the instrument on the GPIB bus.
         /// </summary>
-        public int InstrumentGPIBAddress { get; set;}
+        public int SerialGPIBAddress { get; set;}
 
         /// <summary>
         /// The serial port the instrument (or interface) is connected at.
         /// </summary>
-        public string InstrumentSerialPort { get; set; }
+        public string SerialPort { get; set; }
         
-        public int InstrumentBaudrate { get; set; }
+        public int SerialBaudrate { get; set; }
 
         /// <summary>
         /// What character(s) to use for newline
         /// </summary>
-        public SerialNewlineType AdapterNewline { get; set; }
+        public SerialNewlineType SerialNewline { get; set; }
 
         /// <summary>
         /// Whether to force DTR to true
         /// </summary>
-        public bool AdapterDTR { get; set; }
+        public bool SerialDTR { get; set; }
 
-        public string InstrumentIPAddress { get; set; }
+        public string IPAddress { get; set; }
 
-        public int InstrumentIPPort { get; set; }
+        public int IPPort { get; set; }
+
+        public string VISAResourceName { get; set; }
 
         public int[] MotoTrboKeys { get; set; }
 
@@ -86,12 +89,13 @@
             Version = 1;
             InstrumentType = InstrumentTypeEnum.HP_8900;
             InstrumentConnectionType = InstrumentConnectionTypeEnum.Serial;
-            InstrumentSerialPort = "";
-            InstrumentBaudrate = 115200;
-            IsGPIB = false;
-            InstrumentGPIBAddress = 0;
-            InstrumentIPAddress = "";
-            InstrumentIPPort = 0;
+            SerialPort = "";
+            SerialBaudrate = 115200;
+            SerialIsGPIB = false;
+            SerialGPIBAddress = 0;
+            IPAddress = "";
+            IPPort = 0;
+            VISAResourceName = "";
             MotoTrboKeys = new int[] { 0, 0, 0, 0};
             MotoTrboDelta = 0;
             DangerMode = false;

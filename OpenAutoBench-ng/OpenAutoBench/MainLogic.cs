@@ -48,10 +48,22 @@ namespace OpenAutoBench_ng.OpenAutoBench
             switch (settings.InstrumentConnectionType)
             {
                 case Settings.InstrumentConnectionTypeEnum.Serial:
-                    connection = new SerialConnection(settings.InstrumentSerialPort, settings.InstrumentBaudrate, settings.AdapterNewline, settings.AdapterDTR);
+                    connection = new SerialConnection(settings.SerialPort, settings.SerialBaudrate, settings.SerialNewline, settings.SerialDTR);
+                    System.Diagnostics.Debug.WriteLine($"Creating new serial instrument connection to {settings.SerialPort} at {settings.SerialBaudrate} baud");
                     break;
                 case Settings.InstrumentConnectionTypeEnum.IP:
-                    connection = new IPConnection(settings.InstrumentIPAddress, settings.InstrumentIPPort);
+                    if (string.IsNullOrEmpty(settings.IPAddress))
+                        throw new Exception("IP address cannot be blank!");
+                    if (settings.IPPort <= 0)
+                        throw new Exception("IP port cannot be <= 0");
+                    connection = new IPConnection(settings.IPAddress, settings.IPPort);
+                    System.Diagnostics.Debug.WriteLine($"Creating new IP instrument connection to {settings.IPAddress}:{settings.IPPort}");
+                    break;
+                case Settings.InstrumentConnectionTypeEnum.VISA:
+                    if (string.IsNullOrEmpty(settings.VISAResourceName))
+                        throw new Exception("VISA resource name cannot be blank!");
+                    connection = new VISAConnection(settings.VISAResourceName);
+                    System.Diagnostics.Debug.WriteLine($"Creating new VISA instrument connection to {settings.VISAResourceName}");
                     break;
                 default:
                     throw new Exception("Unsupported connection type. Dying.");
@@ -59,127 +71,81 @@ namespace OpenAutoBench_ng.OpenAutoBench
 
             switch (settings.InstrumentType)
             {
+                // HP 8920, 8921, and 8935 use GPIB via serial or VISA
                 case Settings.InstrumentTypeEnum.HP_8900:
-                    if (!settings.IsGPIB)
+                    if (settings.InstrumentConnectionType == Settings.InstrumentConnectionTypeEnum.Serial)
                     {
-                        throw new Exception("GPIB disabled and HP 8900 selected. This is an impossible combination.");
+                        // Serial requires GPIB to be enabled
+                        if (!settings.SerialIsGPIB) { throw new Exception("HP 89xx control via serial requires GPIB to be enabled"); }
+                        // Create new serial GPIB instrument
+                        instrument = new HP_8900Instrument(connection, settings.SerialGPIBAddress);
                     }
-                     
-                    instrument = new HP_8900Instrument(connection, settings.InstrumentGPIBAddress);
-                    await instrument.Connect();
-                    await Task.Delay(500);
-
-                    try
+                    else if (settings.InstrumentConnectionType == Settings.InstrumentConnectionTypeEnum.VISA)
                     {
-                        await instrument.GetInfo();
+                        // Create new VISA instrument
+                        instrument = new HP_8900Instrument(connection);
                     }
-                    catch (Exception e)
+                    else
                     {
-                        await instrument.Disconnect();
-                        throw new Exception("Connection to instrument failed: " + e.ToString());
+                        throw new Exception("HP89xx requires serial or VISA control");
                     }
                     break;
 
-
+                // Motorola R2670 supports serial control only
                 case Settings.InstrumentTypeEnum.R2670:
-                    if (settings.IsGPIB)
-                    {
-                        throw new Exception("GPIB enabled and R2670 selected. GPIB is not supported on this instrument.");
-                    }
-                    int serialPort = 0;
-                    serialPort = int.Parse(Regex.Match(settings.InstrumentSerialPort, @"\d+").Value);
-                    instrument = new GeneralDynamics_R2670Instrument(connection, serialPort);
-                    await instrument.Connect();
-                    await Task.Delay(500);
-
-                    try
-                    {
-                        if (!(await instrument.GetInfo()))
-                        {
-                            throw new Exception("Get info succeeded but returned a zero length");
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        await instrument.Disconnect();
-                        throw new Exception("Connection to instrument failed: " + e.ToString());
-                    }
+                    // Validation
+                    if (settings.InstrumentConnectionType != Settings.InstrumentConnectionTypeEnum.Serial)
+                        throw new Exception("Motorola R2670 requires serial control");
+                    if (settings.SerialIsGPIB)
+                        throw new Exception("GPIB enabled and Motorola R2670 selected. GPIB is not supported on this instrument.");
+                    
+                    instrument = new GeneralDynamics_R2670Instrument(connection);
                     break;
 
-
+                // IFR 2975 is serial control only
                 case Settings.InstrumentTypeEnum.IFR_2975:
-                    if (settings.IsGPIB)
-                    {
-                        throw new Exception("GPIB enabled and IFR 2975 selected. GPIB is not supported on this instrument.");
-                    }
+                    if (settings.InstrumentConnectionType != Settings.InstrumentConnectionTypeEnum.Serial)
+                        throw new Exception("IFR R2975 requires serial control");
+                    if (settings.SerialIsGPIB)
+                        throw new Exception("GPIB enabled and IFR R2975 selected. GPIB is not supported on this instrument.");
+
                     instrument = new IFR_2975Instrument(connection);
-                    await instrument.Connect();
-                    await Task.Delay(500);
-
-                    try
-                    {
-                        await instrument.GetInfo();
-                    }
-                    catch (Exception e)
-                    {
-                        await instrument.Disconnect();
-                        throw new Exception("Connection to instrument failed: " + e.ToString());
-                    }
                     break;
+                
+                // Astronics R8000 is IP only
                 case Settings.InstrumentTypeEnum.Astronics_R8000:
-                    if (settings.IsGPIB)
-                    {
-                        throw new Exception("GPIB enabled and Astronics R8000 selected. GPIB is not supported on this instrument.");
-                    }
-
-                    if (connection is SerialConnection)
-                    {
-                        throw new Exception("Serial selected and Astronics R8000 selected. Serial is not supported in this instrument.");
-                    }
+                    if (settings.InstrumentConnectionType != Settings.InstrumentConnectionTypeEnum.IP)
+                        throw new Exception("Astronics R8000 requires IP control");
 
                     instrument = new Astronics_R8000Instrument(connection);
-                    await instrument.Connect();
-                    await Task.Delay(500);
-
-                    try
-                    {
-                        await instrument.GetInfo();
-                    }
-                    catch (Exception e)
-                    {
-                        await instrument.Disconnect();
-                        throw new Exception("Connection to instrument failed: " + e.ToString());
-                    }
                     break;
-                case Settings.InstrumentTypeEnum.Viavi_8800SX:
-                    if (settings.IsGPIB)
-                    {
-                        throw new Exception("GPIB enabled and Viavi 8800SX selected. GPIB is not supported on this instrument.");
-                    }
 
-                    if (connection is SerialConnection)
-                    {
-                        throw new Exception("Serial selected and Viavi 8800SX selected. Serial is not supported in this instrument.");
-                    }
+                // Viavi 880SX is IP only
+                case Settings.InstrumentTypeEnum.Viavi_8800SX:
+                    if (settings.InstrumentConnectionType != Settings.InstrumentConnectionTypeEnum.IP)
+                        throw new Exception("Viavi 8800SX requires IP control");
 
                     instrument = new Viavi_8800SXInstrument(connection);
-                    await instrument.Connect();
-                    await Task.Delay(500);
-
-                    try
-                    {
-                        await instrument.GetInfo();
-                    }
-                    catch (Exception e)
-                    {
-                        await instrument.Disconnect();
-                        throw new Exception("Connection to instrument failed: " + e.ToString());
-                    }
                     break;
+
                 default:
                     // this shouldn't happen!
                     throw new Exception("Unsupported instrument somehow selected. Dying.");
             }
+
+            // Connect to new instrument and get info
+            try
+            {
+                await instrument.Connect();
+                await Task.Delay(500);
+                await instrument.GetInfo();
+            }
+            catch (Exception e)
+            {
+                await instrument.Disconnect();
+                throw new Exception("Connection to instrument failed: " + e.ToString());
+            }
+
             return instrument;
         }
 
