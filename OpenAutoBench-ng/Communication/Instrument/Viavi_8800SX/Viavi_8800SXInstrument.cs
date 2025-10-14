@@ -14,6 +14,13 @@ namespace OpenAutoBench_ng.Communication.Instrument.Viavi_8800SX
 
         public bool SupportsDMR { get; set; }
 
+        public string Manufacturer { get; private set; }
+        public string Model { get; private set; }
+        public string Serial { get; private set; }
+        public string Version { get; private set; }
+
+        public int ConfigureDelay { get { return 250; } }
+
         public Viavi_8800SXInstrument(IInstrumentConnection conn)
         {
             Connected = false;
@@ -43,6 +50,13 @@ namespace OpenAutoBench_ng.Communication.Instrument.Viavi_8800SX
         public async Task Disconnect()
         {
             Connection.Disconnect();
+        }
+
+        public async Task<bool> TestConnection()
+        {
+            // TODO: Implement this
+            Console.WriteLine("Connection test not yet implemented for instrument!");
+            return false;
         }
 
         public async Task GenerateSignal(float power)
@@ -91,12 +105,12 @@ namespace OpenAutoBench_ng.Communication.Instrument.Viavi_8800SX
             return float.Parse(await Send(":devmod:reading:val?"));
         }
 
-        public async Task<string> GetInfo()
+        public async Task<bool> GetInfo()
         {
-            string mfr = await Send(":options:man?");
-            string model = await Send(":options:model?");
-            string serial = await Send(":options:serial?");
-            return $"{mfr},{model},{serial}";
+            Manufacturer = await Send(":options:man?");
+            Model = await Send(":options:model?");
+            Serial = await Send(":options:serial?");
+            return true;
         }
 
         public async Task Reset()

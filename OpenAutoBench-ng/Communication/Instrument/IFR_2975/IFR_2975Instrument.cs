@@ -12,6 +12,13 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
 
         public bool SupportsDMR { get { return false; } }
 
+        public string Manufacturer { get; private set; }
+        public string Model { get; private set; }
+        public string Serial { get; private set; }
+        public string Version { get; private set; }
+
+        public int ConfigureDelay { get { return 250; } }
+
         public IFR_2975Instrument(IInstrumentConnection conn)
         {
             Connected = false;
@@ -39,6 +46,13 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
         {
             await Send("LOCKOUT OFF");
             Connection.Disconnect();
+        }
+
+        public async Task<bool> TestConnection()
+        {
+            // TODO: Implement this
+            Console.WriteLine("Connection test not yet implemented for instrument!");
+            return false;
         }
 
         public async Task GenerateSignal(float power)
@@ -99,9 +113,24 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
             return float.Parse(await Send("FMDev VALue")) * 1000F;
         }
 
-        public async Task<string> GetInfo()
+        public async Task<bool> GetInfo()
         {
-            return await Send("*IDN?");
+            // Get response from IDN which should be <company name>, <model number>, <serial number>, <firmware revision>
+            string idenResp = await Send("*IDN?");
+            try
+            {
+                string[] idenParams = idenResp.Split(',');
+                Manufacturer = idenParams[0];
+                Model = idenParams[1];
+                Serial = idenParams[2];
+                Version = idenParams[3];
+            }
+            catch (IndexOutOfRangeException)
+            {
+                Console.WriteLine("IDN response invalid!");
+                return false;
+            }
+            return true;
         }
 
         public async Task Reset()

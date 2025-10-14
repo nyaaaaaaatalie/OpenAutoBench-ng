@@ -1,4 +1,6 @@
-﻿using OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase;
+﻿using CSPID;
+using OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase;
+using OpenAutoBench_ng.OpenAutoBench;
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
 {
@@ -9,10 +11,10 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
             //
         }
 
-        public async Task setup()
+        public override async Task Setup()
         {
-            await base.setup();
-            int[] TXFrequencies = MotorolaAPX_Frequencies.TxFrequencies(Radio);
+            await base.Setup();
+            int[] TXFrequencies = MotorolaAPX_RefData.TxFrequencies(radio);
             TXFrequency = TXFrequencies[TXFrequencies.Length - 1];
         }
     }

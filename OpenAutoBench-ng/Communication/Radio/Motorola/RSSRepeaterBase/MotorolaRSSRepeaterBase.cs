@@ -9,6 +9,10 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
     {
         public string Name { get; private set; }
 
+        public virtual string ModelName { get; private set; }
+
+        public string ModelNumber { get; private set; }
+
         public string SerialNumber { get; private set; }
 
         public string FirmwareVersion { get; private set; }
@@ -124,11 +128,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
             if (testParams.doRefoscTest)
             {
                 MotorolaRSSRepeater_TestTX_ReferenceOscillator test = new MotorolaRSSRepeater_TestTX_ReferenceOscillator(testParams);
-                await test.setup();
+                await test.Setup();
                 await Task.Delay(1000);
-                await test.performTest();
+                await test.PerformTest();
                 await Task.Delay(1000);
-                await test.teardown();
+                await test.Teardown();
 
             }
 
@@ -137,11 +141,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
             if (testParams.doPowerTest)
             {
                 MotorolaRSSRepeater_TestTX_Power test = new MotorolaRSSRepeater_TestTX_Power(testParams);
-                await test.setup();
+                await test.Setup();
                 await Task.Delay(1000);
-                await test.performTest();
+                await test.PerformTest();
                 await Task.Delay(1000);
-                await test.teardown();
+                await test.Teardown();
             }
 
             await Task.Delay(1000);
@@ -149,11 +153,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
             if (testParams.doDeviationTest)
             {
                 MotorolaRSSRepeater_TestTX_Deviation test = new MotorolaRSSRepeater_TestTX_Deviation(testParams);
-                await test.setup();
+                await test.Setup();
                 await Task.Delay(1000);
-                await test.performTest();
+                await test.PerformTest();
                 await Task.Delay(1000);
-                await test.teardown();
+                await test.Teardown();
             }
 
             await Task.Delay(1000);
@@ -178,21 +182,21 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase
             if (testParams.doRefoscTest)
             {
                 MotorolaRSSRepeater_TestTX_ReferenceOscillator test = new MotorolaRSSRepeater_TestTX_ReferenceOscillator(testParams);
-                await test.setup();
+                await test.Setup();
                 await Task.Delay(1000);
-                await test.performAlignment();
+                await test.PerformAlignment();
                 await Task.Delay(1000);
-                await test.teardown();
+                await test.Teardown();
             }
 
             if (testParams.doPowerTest)
             {
                 MotorolaRSSRepeater_TestTX_Power test = new MotorolaRSSRepeater_TestTX_Power(testParams);
-                await test.setup();
+                await test.Setup();
                 await Task.Delay(1000);
-                await test.performAlignment();
+                await test.PerformAlignment();
                 await Task.Delay(1000);
-                await test.teardown();
+                await test.Teardown();
             }
             await Task.Delay(1000);
             await Reset();

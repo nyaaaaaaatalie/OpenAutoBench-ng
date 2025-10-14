@@ -24,6 +24,13 @@
             IP = 2,
         }
 
+        public enum SerialNewlineType
+        {
+            LF = 0,
+            CR = 1,
+            CRLF = 2,
+        }
+
         public InstrumentConnectionTypeEnum InstrumentConnectionType { get; set; }
 
         /// <summary>
@@ -43,6 +50,16 @@
         public string InstrumentSerialPort { get; set; }
         
         public int InstrumentBaudrate { get; set; }
+
+        /// <summary>
+        /// What character(s) to use for newline
+        /// </summary>
+        public SerialNewlineType AdapterNewline { get; set; }
+
+        /// <summary>
+        /// Whether to force DTR to true
+        /// </summary>
+        public bool AdapterDTR { get; set; }
 
         public string InstrumentIPAddress { get; set; }
 

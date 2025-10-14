@@ -20,27 +20,27 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XPR
             if (testParams.doRefoscTest)
             {
                 MotorolaXPR_TestTX_ReferenceOscillator test = new MotorolaXPR_TestTX_ReferenceOscillator(testParams);
-                await test.setup();
-                await test.performTest();
-                await test.teardown();
+                await test.Setup();
+                await test.PerformTest();
+                await test.Teardown();
             }
             await Task.Delay(1000);
 
             if (testParams.doDeviationTest)
             {
                 MotorolaXPR_TestTX_DeviationBalance test = new MotorolaXPR_TestTX_DeviationBalance(testParams);
-                await test.setup();
-                await test.performTest();
-                await test.teardown();
+                await test.Setup();
+                await test.PerformTest();
+                await test.Teardown();
             }
             await Task.Delay(1000);
 
             if (testParams.doPowerTest)
             {
                 MotorolaXPR_TestTX_PowerCharacterization test = new MotorolaXPR_TestTX_PowerCharacterization(testParams);
-                await test.setup();
-                await test.performTest();
-                await test.teardown();
+                await test.Setup();
+                await test.PerformTest();
+                await test.Teardown();
             }
             await Task.Delay(1000);
 
