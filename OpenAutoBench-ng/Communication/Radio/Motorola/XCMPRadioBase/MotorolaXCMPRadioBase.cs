@@ -24,6 +24,62 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         protected IXCMPRadioConnection _connection;
 
+        public enum Opcode : byte
+        {
+            SOFTPOT = 0x01,
+            TRANSMIT_CONFIG = 0x02,
+            RECEIVE_CONFIG = 0x03,
+            TRANSMIT = 0x04,
+            RECEIVE = 0x05,
+            TX_POWER_LEVEL_INDEX = 0x06,
+            PREEMPH_DEEMPH = 0x07,
+            SQUELCH_CONTROL = 0x08,
+            VOLUME_CONTROL = 0x09,
+            RX_FREQUENCY = 0x0A,
+            TX_FREQUENCY = 0x0B,
+            ENTER_TEST_MODE = 0x0C,
+            RADIO_RESET = 0x0D,
+            RADIO_STATUS = 0x0E,
+            VERSION_INFO = 0x0F,
+            MODEL_NUMBER = 0x10,
+            SERIAL_NUMBER = 0x11,
+            READ_UUID = 0x12,
+            ENCRYPTION_ALGID = 0x13,
+            DATA_XFER_TO_ENC_MODULE = 0x14,
+            ENC_MODULE_BOOT_MODE = 0x15,
+            RX_BER_CONTROL = 0x16,
+            RX_BER_SYNC_REPORT = 0x17,
+
+            AFC_CONTROL = 0x1C,
+            ATTEN_CONTROL = 0x1E,
+            IQME_UPDTE = 0x29
+        }
+
+        public enum Result : byte
+        {
+            SUCCESS = 0x00,
+            FAILURE = 0x01,
+            INCORRECT_MODE = 0x02,
+            OPCODE_NOT_SUPPORTED = 0x03,
+            INVALID_PARAMETER = 0x04,
+            REPLY_TOO_BIG = 0x05,
+            SECURITY_LOCKED = 0x06,
+
+            FACTORY_INFO_MAX_TYPES = 0x08,
+
+            SOFTPOT_OP_NOT_SUPPORTED = 0x40,
+            SOFTPOT_TYPE_NOT_SUPPORTED = 0x41,
+            SOFTPOT_VALUE_OUT_OF_RANGE = 0x42,
+
+            FLASH_WRITE_FAILURE = 0x80,
+            ISH_ITEM_NOT_FOUND = 0x81,
+            ISH_OFFSET_OUT_OF_RANGE = 0x82,
+            ISH_INSUFFICIENT_SPACE = 0x83,
+            ISH_PARTITION_NOT_EXIST = 0x84,
+            ISH_PARTITION_READ_ONLY = 0x85,
+            ISH_REORG_NEEDED = 0x86,
+        }
+
         public enum VersionOperation : byte
         {
             HostSoftware = 0x00,
@@ -52,15 +108,22 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public enum SoftpotOperation : byte
         {
-            Read = 0x00,
-            Write = 0x01,
-            Update = 0x02,
-            ReadAll = 0x03,
-            WriteAll = 0x04,
-            Autotune = 0x05,
-            ReadMin = 0x06,
-            ReadMax = 0x07,
-            ReadFrequency = 0x08,
+            READ = 0x00,
+            WRITE = 0x01,
+            UPDATE = 0x02,
+            READ_ALL = 0x03,
+            WRITE_ALL = 0x04,
+            AUTOTUNE = 0x05,
+            READ_MIN = 0x06,
+            READ_MAX = 0x07,
+            READ_ALL_FREQ = 0x08,
+        }
+
+        public enum SoftpotBEROperation : byte
+        { 
+            BER_DISABLE = 0x00,
+            BER_ENABLE_SINGLE = 0x01,
+            BER_ENABLE_CONTINUOUS = 0x02
         }
 
         public enum SoftpotType : byte
@@ -132,12 +195,16 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             {
                 SerialNumber = System.Text.Encoding.UTF8.GetString(GetStatus(StatusOperation.SerialNumber)).TrimEnd('\0');
                 ModelNumber = System.Text.Encoding.UTF8.GetString(GetStatus(StatusOperation.ModelNumber)).TrimEnd('\0');
+
+                Console.WriteLine($"XCMP: connected to radio model {ModelNumber} (S/N {SerialNumber}");
             }
         }
 
         public void Disconnect()
         {
             _connection.Disconnect();
+
+            Console.WriteLine($"XCMP: Disconnected from radio");
         }
 
         public byte[] Send(byte[] data)
@@ -157,7 +224,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
             Array.Copy(data, 0, toSend, 2, dataLen);
 
-            Console.WriteLine("Sending  " + Convert.ToHexString(toSend));
+            Console.WriteLine("XCMP >> " + Convert.ToHexString(toSend));
 
             _connection.Send(toSend);
 
@@ -173,7 +240,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 len |= (fromRadio[0] << 8) & 0xFF;
                 len |= fromRadio[1];
 
-                Console.WriteLine("Received " + Convert.ToHexString(fromRadio.Take(len + 2).ToArray()));
+                Console.WriteLine("XCMP << " + Convert.ToHexString(fromRadio.Take(len + 2).ToArray()));
 
                 byte[] retval = new byte[len];
 
@@ -193,11 +260,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public byte[] GetVersion(VersionOperation oper)
         {
+            Console.WriteLine($"XCMP: getting radio version {Enum.GetName<VersionOperation>(oper)}");
+
             byte[] cmd = new byte[3];
 
             // XCMP opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x0f;
+            cmd[1] = (byte)Opcode.VERSION_INFO;
 
             // the power index
             cmd[2] = (byte)oper;
@@ -207,11 +276,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public byte[] GetStatus(StatusOperation oper)
         {
+            Console.WriteLine($"XCMP: getting radio status {Enum.GetName<StatusOperation>(oper)}");
+
             byte[] cmd = new byte[3];
 
             // XCMP opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x0e;
+            cmd[1] = (byte)Opcode.RADIO_STATUS;
 
             // the status byte
             cmd[2] = (byte)oper;
@@ -229,11 +300,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public void SetPowerLevel(int powerIndex)
         {
+            Console.WriteLine($"XCMP: setting power level to index {powerIndex}");
+
             byte[] cmd = new byte[3];
             
             // XCMP opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x06;
+            cmd[1] = (byte)Opcode.TX_POWER_LEVEL_INDEX;
             
             // the power index
             cmd[2] = (byte)powerIndex;
@@ -243,17 +316,21 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public void EnterServiceMode()
         {
+            Console.WriteLine($"XCMP: entering service mode");
+
             byte[] cmd = new byte[2];
 
             // XCMP opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x0c;
+            cmd[1] = (byte)Opcode.ENTER_TEST_MODE;
 
             Send(cmd);
         }
 
         public void ResetRadio()
         {
+            Console.WriteLine($"XCMP: resetting radio");
+
             byte[] cmd = new byte[2];
 
             // XCMP opcode
@@ -265,6 +342,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public void SetTXFrequency(int frequency, bool modulated)
         {
+            Console.WriteLine($"XCMP: setting TX frequency to {frequency} (Modulated: {modulated})");
+
             // divide by 5 to fit in XCMP opcode
             frequency = frequency / 5;
             byte[] cmd = new byte[8];
@@ -290,6 +369,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public void SetRXFrequency(int frequency, bool modulated)
         {
+            Console.WriteLine($"XCMP: setting RX frequency to {frequency} (Modulated: {modulated})");
+
             // divide by 5 to fit in XCMP opcode
             frequency = frequency / 5;
             byte[] cmd = new byte[8];
@@ -315,11 +396,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public void Keyup()
         {
+            Console.WriteLine($"XCMP: keying radio");
+
             byte[] cmd = new byte[3];
 
             // transmit opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x04;
+            cmd[1] = (byte)Opcode.TRANSMIT;
 
             cmd[2] = 0x03;
 
@@ -328,11 +411,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public void Dekey()
         {
+            Console.WriteLine($"XCMP: dekeying radio");
+
             byte[] cmd = new byte[3];
 
             // receive opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x05;
+            cmd[1] = (byte)Opcode.RECEIVE;
 
             cmd[2] = 0x11;
 
@@ -346,13 +431,15 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <returns>The bytes representing the softpot value (variable length)</returns>
         public byte[] SoftpotGetValue(SoftpotType type)
         {
+            Console.WriteLine($"XCMP: Getting softpot value for {Enum.GetName<SoftpotType>(type)}");
+
             byte[] cmd = new byte[4];
 
             // receive opcode
             cmd[0] = 0x00;
             cmd[1] = 0x01;
             // read operation
-            cmd[2] = (byte)SoftpotOperation.Read;
+            cmd[2] = (byte)SoftpotOperation.READ;
             // softpot type
             cmd[3] = (byte)type;
 
@@ -360,9 +447,9 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             byte[] resp = Send(cmd);
 
             // Make sure we were successful
-            if (resp[2] != 0x00)
+            if (resp[2] != (byte)Result.SUCCESS)
             {
-                throw new InvalidDataException("Softpot read command did not return SUCCESS!");
+                throw new InvalidDataException($"Softpot GetValue command returned {Enum.GetName(typeof(Result), resp[2])}");
             }
 
             // Validate type is the same
@@ -384,13 +471,15 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <exception cref="InvalidDataException"></exception>
         public byte[] SoftpotGetMinimum(SoftpotType type)
         {
+            Console.WriteLine($"XCMP: getting softpot minimum for {Enum.GetName<SoftpotType>(type)}");
+
             byte[] cmd = new byte[4];
 
             // softpot opcode 0x0001
             cmd[0] = 0x00;
             cmd[1] = 0x01;
             // operation
-            cmd[2] = (byte)SoftpotOperation.ReadMin;
+            cmd[2] = (byte)SoftpotOperation.READ_MIN;
             // softpot type
             cmd[3] = (byte)type;
 
@@ -398,9 +487,9 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             byte[] resp = Send(cmd);
 
             // Make sure we were successful
-            if (resp[2] != 0x00)
+            if (resp[2] != (byte)Result.SUCCESS)
             {
-                throw new InvalidDataException("Softpot read command did not return SUCCESS!");
+                throw new InvalidDataException($"Softpot GetMinimum command returned {Enum.GetName(typeof(Result), resp[2])}");
             }
 
             // Validate type is the same
@@ -422,13 +511,15 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <exception cref="InvalidDataException"></exception>
         public byte[] SoftpotGetMaximum(SoftpotType type)
         {
+            Console.WriteLine($"XCMP: getting softpot maximum for {Enum.GetName<SoftpotType>(type)}");
+
             byte[] cmd = new byte[4];
 
             // Softpot opcode 0x0001
             cmd[0] = 0x00;
             cmd[1] = 0x01;
             // Operation
-            cmd[2] = (byte)SoftpotOperation.ReadMax;
+            cmd[2] = (byte)SoftpotOperation.READ_MAX;
             // Softpot type
             cmd[3] = (byte)type;
 
@@ -436,9 +527,9 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             byte[] resp = Send(cmd);
 
             // Make sure we were successful
-            if (resp[2] != 0x00)
+            if (resp[2] != (byte)Result.SUCCESS)
             {
-                throw new InvalidDataException("Softpot get max command did not return SUCCESS!");
+                throw new InvalidDataException($"Softpot GetMaximum command returned {Enum.GetName(typeof(Result), resp[2])}");
             }
 
             // Validate type is the same
@@ -460,13 +551,15 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <exception cref="InvalidDataException"></exception>
         public void SoftpotWrite(SoftpotType type, byte[] val)
         {
+            Console.WriteLine($"XCMP: writing softpot {Enum.GetName<SoftpotType>(type)} -> {Convert.ToHexString(val)}");
+
             byte[] cmd = new byte[4 + val.Length];
 
             // Softpot opcode
             cmd[0] = 0x00;
             cmd[1] = 0x01;
             // operation
-            cmd[2] = (byte)SoftpotOperation.Write;
+            cmd[2] = (byte)SoftpotOperation.WRITE;
             // Type
             cmd[3] = (byte)type;
             // Value
@@ -476,9 +569,9 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             byte[] resp = Send(cmd);
 
             // Make sure we were successful
-            if (resp[2] != 0x00)
+            if (resp[2] != (byte)Result.SUCCESS)
             {
-                throw new InvalidDataException($"Softpot write command did not return SUCCESS! (Got {resp[2]})");
+                throw new InvalidDataException($"Softpot write command returned {Enum.GetName(typeof(Result), resp[2])}");
             }
         }
 
@@ -489,13 +582,15 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <param name="val"></param>
         public void SoftpotUpdate(SoftpotType type, byte[] val)
         {
+            Console.WriteLine($"XCMP: updating softpot {Enum.GetName<SoftpotType>(type)} -> {Convert.ToHexString(val)}");
+            
             byte[] cmd = new byte[4 + val.Length];
 
             // receive opcode
             cmd[0] = 0x00;
             cmd[1] = 0x01;
 
-            cmd[2] = (byte)SoftpotOperation.Update;
+            cmd[2] = (byte)SoftpotOperation.UPDATE;
 
             cmd[3] = (byte)type;
 
@@ -504,9 +599,9 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             byte[] resp = Send(cmd);
 
             // Make sure we were successful
-            if (resp[2] != 0x00)
+            if (resp[2] != (byte)Result.SUCCESS)
             {
-                throw new InvalidDataException($"Softpot update command did not return SUCCESS! (Got {resp[2]})");
+                throw new InvalidDataException($"Softpot update command returned {Enum.GetName(typeof(Result), resp[2])}");
             }
         }
 
@@ -517,11 +612,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public void SetTransmitConfig(XCMPRadioTransmitOption option)
         {
+            Console.WriteLine($"XCMP: setting TX config to {Enum.GetName<XCMPRadioTransmitOption>(option)}");
+
             byte[] cmd = new byte[3];
 
             // transmit config opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x02;
+            cmd[1] = (byte)Opcode.TRANSMIT_CONFIG;
 
             cmd[2] = (byte)option;
 
@@ -530,11 +627,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public void SetReceiveConfig(XCMPRadioReceiveOption option)
         {
+            Console.WriteLine($"XCMP: setting RX config to {Enum.GetName<XCMPRadioReceiveOption>(option)}");
+
             byte[] cmd = new byte[3];
 
             // receive config opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x03;
+            cmd[1] = (byte)Opcode.RECEIVE_CONFIG;
 
             cmd[2] = (byte)option;
 
@@ -557,11 +656,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public double GetP25BER(int nbrFrames)
         {
+            Console.WriteLine($"XCMP: getting {nbrFrames} frames of P25 BER");
+
             byte[] cmd = new byte[4];
 
             // receive config opcode
             cmd[0] = 0x00;
-            cmd[1] = 0x03;
+            cmd[1] = (byte)Opcode.RECEIVE_CONFIG;
 
             cmd[2] = 0x21; //test Pattern - P25 1011 Standard
             cmd[3] = 0x00; // Mod Type - C4FM
