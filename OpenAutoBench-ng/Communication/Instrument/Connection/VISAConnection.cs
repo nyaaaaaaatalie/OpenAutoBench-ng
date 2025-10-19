@@ -1,5 +1,6 @@
 ﻿using Ivi.Visa;
 using NationalInstruments.Visa;
+using System.Text;
 
 namespace OpenAutoBench_ng.Communication.Instrument.Connection
 {
@@ -32,6 +33,8 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
             using (ResourceManager resourceManager = new ResourceManager())
             {
                 _mb = (MessageBasedSession)resourceManager.Open(_resource);
+                // Set a timeout of 500 ms
+                _mb.TimeoutMilliseconds = 500;
             }
             connected = true;
         }
@@ -45,6 +48,20 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
         }
 
         /// <summary>
+        /// Send a command and don't expect a response
+        /// </summary>
+        /// <param name="toSend"></param>
+        /// <returns></returns>
+        public async Task Write(string toSend)
+        {
+            if (!connected) { throw new Exception("VISA disconnected"); }
+            // Log
+            Console.WriteLine($"VISA: >>SNT>> {toSend} ({BitConverter.ToString(Encoding.UTF8.GetBytes(toSend))})");
+            // Send
+            _mb.RawIO.Write(toSend);
+        }
+
+        /// <summary>
         /// Send a command and expect a response
         /// </summary>
         /// <param name="toSend"></param>
@@ -52,10 +69,29 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
         public async Task<string> Send(string toSend)
         {
             if (!connected) { throw new Exception("VISA disconnected"); }
+            // Log
+            Console.WriteLine($"VISA: >>SNT>> {toSend} ({BitConverter.ToString(Encoding.UTF8.GetBytes(toSend))})");
             // Send the command string
             _mb.RawIO.Write(toSend);
-            // Read back a line
-            return _mb.RawIO.ReadString();
+            // Read back a line (try 5 times, 5 * 500ms = 2.5 seconds for a timeout)
+            int tries = 5;
+            while (tries > 0)
+            {
+                try
+                {
+                    string resp = _mb.RawIO.ReadString();
+                    // Log
+                    Console.WriteLine($"VISA: <<RCV<< {resp} ({BitConverter.ToString(Encoding.UTF8.GetBytes(resp))})");
+                    // Return
+                    return resp;
+                }
+                catch (IOTimeoutException ex)
+                {
+                    Console.WriteLine($"VISA: Read timeout, retrying...{6 - tries}/5");
+                }
+                tries--;
+            }
+            throw new TimeoutException("VISA: Failed to read data within timeout window");
         }
 
         public async Task Transmit(string toSend)

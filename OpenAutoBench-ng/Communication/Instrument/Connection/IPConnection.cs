@@ -54,6 +54,11 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
             return data;
         }
 
+        public async Task Write(string toSend)
+        {
+            await Transmit(toSend);
+        }
+
         public async Task<string> Send(string toSend)
         {
             await Transmit(toSend);

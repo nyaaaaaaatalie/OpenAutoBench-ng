@@ -121,15 +121,17 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 UInt16 header = (UInt16)((data[2] << 8) + (data[3] & 0xFF));
                 MsgType = GetMsgType(header);
                 Opcode = GetOpcode(header);
-                Console.WriteLine($"XCMP: Got MsgType {(byte)MsgType:X} ({Enum.GetName(MsgType)}), Opcode {(byte)Opcode:X} ({Enum.GetName(Opcode)})");
+                
                 if (MsgType == MsgType.RESPONSE)
                 {
                     Result = (Result)data[4];
                     Data = data.Skip(5).Take(len - 3).ToArray();
+                    Console.WriteLine($"XCMP: Got MsgType {(byte)MsgType:X} ({Enum.GetName(MsgType)}), Opcode {(byte)Opcode:X} ({Enum.GetName(Opcode)}), Result {(byte)Result:X} ({Enum.GetName(Result)}), Data: [{Convert.ToHexString(Data)}]");
                 }
                 else
                 {
                     Data = data.Skip(4).Take(len - 2).ToArray();
+                    Console.WriteLine($"XCMP: Got MsgType {(byte)MsgType:X} ({Enum.GetName(MsgType)}), Opcode {(byte)Opcode:X} ({Enum.GetName(Opcode)}), Data: [{Convert.ToHexString(Data)}]");
                 }
                 // Validate
                 if (Length != len)
@@ -144,30 +146,50 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             /// <summary>
             /// The softpot operation
             /// </summary>
-            public SoftpotOperation Operation { get; private set; }
+            public SoftpotOperation Operation { 
+                get
+                {
+                    return (SoftpotOperation)Data[0];
+                }
+                set
+                {
+                    Data[0] = (byte)value;
+                }
+            }
             /// <summary>
             /// The softpot type
             /// </summary>
-            public SoftpotType Type { get; private set; }
+            public SoftpotType Type
+            {
+                get
+                {
+                    return (SoftpotType)Data[1];
+                }
+                set
+                {
+                    Data[1] = (byte)value;
+                }
+            }
             /// <summary>
             /// The softpot value or values as a variable-length byte array
             /// </summary>
-            public byte[] Value { get; set; }
-            /// <summary>
-            /// Get the XCMP data including the softpot operation and type
-            /// </summary>
-            public new byte[] Data {
+            public byte[] Value {  
                 get
                 {
-                    byte[] data = new byte[Value.Length + 2];
-                    data[0] = (byte)Operation;
-                    data[1] = (byte)Type;
-                    Array.Copy(Value, 0, data, 2, Value.Length);
-                    return data;
+                    // Return everything after the softpot oepration/type
+                    return Data.Skip(2).ToArray();
                 }
-                private set
+                set
                 {
-                    // stub
+                    // Save the old values for recreating the array
+                    SoftpotOperation oper = Operation;
+                    SoftpotType type = Type;
+                    // Create a new data array
+                    Data = new byte[value.Length + 2];
+                    Operation = oper;
+                    Type = type;
+                    // Copy the value into the data array
+                    Array.Copy(value, 0, Data, 2, value.Length);
                 }
             }
             /// <summary>
@@ -178,24 +200,18 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             /// <param name="type"></param>
             public SoftpotMessage(MsgType msgType, SoftpotOperation operation, SoftpotType type) : base(msgType, Opcode.SOFTPOT)
             {
+                // Start the data array with size 2
+                Data = new byte[2];
+                // Parse our values
                 Operation = operation;
                 Type = type;
             }
-
+            /// <summary>
+            /// Parse a softpot-specific XCMP message from a byte array
+            /// </summary>
+            /// <param name="data"></param>
             public SoftpotMessage(byte[] data) : base(data)
             {
-                if (MsgType == MsgType.RESPONSE)
-                {
-                    Operation = (SoftpotOperation)data[5];
-                    Type = (SoftpotType)data[6];
-                    Value = data.Skip(7).ToArray();
-                }
-                else
-                {
-                    Operation = (SoftpotOperation)data[4];
-                    Type = (SoftpotType)data[5];
-                    Value = data.Skip(6).ToArray();
-                }
             }
         }
 
@@ -211,7 +227,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         }
 
         /// <summary>
-        /// Convert a 4-byte array to a frequency in Hz
+        /// Convert a 4-byte motorola frequency to a frequency in Hz
         /// </summary>
         /// <param name="data"></param>
         /// <returns></returns>
@@ -219,18 +235,19 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         {
             // Validate length
             if (data.Length != 4) { throw new ArgumentException("Frequency data must be 4 bytes!"); }
-            // Convert bytes to int32 and multiply by 5 Hz
-            return (UInt32)(BitConverter.ToInt32(data) * 5);
+            // Convert bytes to int32 and multiply by 5 Hz (after reversing the endianess)
+            return (UInt32)(BitConverter.ToInt32(data.Reverse().ToArray()) * 5);
         }
 
         /// <summary>
-        /// Convert a frequency in Hz to a 4-byte array
+        /// Convert a frequency in Hz to a 4-byte motorola-specific array
         /// </summary>
         /// <param name="frequency"></param>
         /// <returns></returns>
         public static byte[] FrequencyToBytes(int frequency)
         {
-            return BitConverter.GetBytes((UInt32)frequency);
+            // We reverse the byte order to get the endianness correct
+            return BitConverter.GetBytes((UInt32)frequency / 5).Reverse().ToArray();
         }
 
         /// <summary>
@@ -440,7 +457,14 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RADIO_STATUS);
             msg.Data = new byte[] { (byte)oper };
 
-            return Send(msg).Data;
+            XcmpMessage resp = Send(msg);
+
+            // Verify we got the same status back
+            if ((StatusOperation)resp.Data[0] != oper)
+                throw new Exception($"Did not receive expected status operation (got {resp.Data[0]:X} ({Enum.GetName((StatusOperation)resp.Data[0])}) but expected {(byte)oper:X} ({Enum.GetName(oper)}))");
+
+            // Skip the first byte (the operation)
+            return resp.Data.Skip(1).ToArray();
         }
 
         public MotorolaBand[] GetBands()
@@ -455,17 +479,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             List<MotorolaBand> bands = new List<MotorolaBand>();
             foreach(byte b in resp.Data) { bands.Add((MotorolaBand)b); }
             return bands.ToArray();
-        }
-
-
-        public void SetPowerLevelIndex(int idx)
-        {
-            Console.WriteLine($"XCMP: setting power level to index {idx}");
-
-            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.TX_POWER_LEVEL_INDEX);
-            msg.Data = new byte[] { (byte)idx };
-
-            Send(msg);
         }
 
         public void EnterServiceMode()
@@ -662,6 +675,16 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         {
             // Implemented by derived classes
             throw new NotImplementedException();
+        }
+
+        public virtual void SetTransmitPower(TxPowerLevel power)
+        {
+            Console.WriteLine($"XCMP: setting TX power to {Enum.GetName(power)}");
+
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.TX_POWER_LEVEL_INDEX);
+            msg.Data = new byte[1] { (byte)power };
+
+            Send(msg);
         }
 
         public void SetTransmitConfig(XCMPRadioTransmitOption option)

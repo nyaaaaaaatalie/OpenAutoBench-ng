@@ -241,8 +241,8 @@
     {
         High = 0x00,
         Mid = 0x01,
-        Low = 0x03,
-        LowNew = 0x04,
+        Low = 0x02,
+        LowNew = 0x03,
         Undefined = 0xFF
     }
 

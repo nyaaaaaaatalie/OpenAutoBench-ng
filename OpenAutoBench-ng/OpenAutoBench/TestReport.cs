@@ -354,7 +354,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
             reportText +=  "~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=\n";
             reportText +=  "| OpenAutoBench-ng Test Report                                                                         |\n";
             reportText +=  "|                                                                                                      |\n";
-            reportText += $"| Radio: {Radio.ModelNumber ?? "No Radio",-23}                                                                       |\n";
+            reportText += $"| Radio: {((Radio != null) ? Radio.ModelNumber : "No Radio"),-23}                                                                       |\n";
             // Date
             reportText +=  "~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=\n";
             reportText += $"| Report Start: {StartTime,-16}  | End: {EndTime,16}  | Duration: {Duration.ToString(@"hh\:mm\:ss")}                 |\n";

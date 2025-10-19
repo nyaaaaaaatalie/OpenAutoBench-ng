@@ -1,5 +1,6 @@
 ﻿using OpenAutoBench_ng.Communication.Instrument.Connection;
 using OpenAutoBench_ng.OpenAutoBench;
+using System.Linq.Expressions;
 
 namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 {
@@ -55,7 +56,21 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
 
         private async Task<string> Send(string command)
         {
-            return await Connection.Send(command);
+            try
+            {
+                return await Connection.Send(command);
+            }
+            catch (TimeoutException ex)
+            {
+                // On 8900 series instruments, we can get hung up if a measurement doesn't hit before a timeout
+                // In this case, there's a specific sequence we have to do, otherwise the instrument can get hung up and require a power cycle
+                // More info: https://www.keysight.com/us/en/assets/9022-00221/miscellaneous/5306OSKR-SKD-5111-020009.html
+                Console.WriteLine($"HP8900: Sending SDC and measurement clear commands");
+                await Connection.Write("\x04");
+                await Connection.Write("TRIG:ABORT;MODE:RETR REP");
+                // Pass the exception up
+                throw new TimeoutException(ex.Message);
+            }
         }
 
         private async Task Transmit(string command)
@@ -192,7 +207,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.HP_8900
             string idenResp = await Send("*IDN?");
             try
             {
-                string[] idenParams = idenResp.Split(',');
+                string[] idenParams = idenResp.Trim().Split(',');
                 Manufacturer = idenParams[0];
                 Model = idenParams[1];
                 Serial = idenParams[2];

@@ -141,5 +141,14 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
             return SoftpotReadAllFrequencies(SoftpotType.TxPowerCharPoint);
         }
         
+        public override void SetTransmitPower(TxPowerLevel power)
+        {
+            // Override low power on APX8000 with low power (new)
+            if (ModelNumber.StartsWith("H91T") && power == TxPowerLevel.Low)
+                base.SetTransmitPower(TxPowerLevel.LowNew);
+            else
+                base.SetTransmitPower(power);
+        }
+
     }
 }
