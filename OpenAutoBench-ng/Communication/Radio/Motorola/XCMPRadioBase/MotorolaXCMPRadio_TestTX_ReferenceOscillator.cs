@@ -65,7 +65,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             }
             finally
             {
-                Radio.Dekey();
+                radio.Dekey();
             }
         }
 

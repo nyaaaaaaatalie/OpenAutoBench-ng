@@ -227,6 +227,58 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             public int[] Values { get; set; }
         }
 
+        public enum SoftpotType : byte
+        {
+            RefOsc = 0x00,
+            TxPower = 0x01,
+            ModBalance = 0x02,
+            FrontendFilt1 = 0x03,
+            CurrentLimit = 0x04,
+            ModLimit = 0x05,
+            TempComp = 0x06,
+            TxPowerChar = 0x07,
+            BattCal = 0x08,
+            RFPABias1 = 0x09,
+            RFPABias2 = 0x0A,
+            RFPABias3 = 0x0B,
+            RFPABias4 = 0x0C,
+            FrontendFilt2 = 0x0D,
+            FrontendFilt3 = 0x0E,
+            RFPAGainCal = 0x0F,
+            RFPAGainCalPoint = 0x10,
+            TxPowerCharPoint = 0x11,
+            IntMicGain = 0x12,
+            ExtMicGain = 0x13,
+            TxIQBal = 0x14,
+            MaxTunedPwr = 0x15,
+            HPDRSSIComp = 0x16,
+            HPDRFPABias1 = 0x17,
+            HPDRFPABias2 = 0x18,
+            HPDRFPABias3 = 0x19,
+            HPDRFPABias4 = 0x1A,
+            HPDCurentLimit = 0x1B,
+            HPDTxPower = 0x1C,
+            HPDPhaseComp = 0x1D,
+            HPDAmpComp = 0x1E,
+            RxAttComp = 0x1F,
+            FrontEndGain = 0x20,
+            StepAtten = 0x21,
+            Volume = 0x22,
+            PwrCtrlAttOff = 0x23,
+            DACn = 0x24,
+            IntTempADC = 0x25,
+            BattVoltADC = 0x26,
+            PAVoltLimit = 0x27,
+            PAMaxIset = 0x28,
+            PwrCtrlBattParam = 0x29,
+            BattVoltCutSlope = 0x2A,
+            LowPortMod = 0x2B,
+            PASatRef = 0x2C,
+            SpurSetting = 0x2D,
+            IntRDAC = 0x2E,
+            RDACPwrChar = 0x2F,
+        }
+
         public MotorolaXCMPRadioBase(IXCMPRadioConnection conn)
         {
             Name = "";
