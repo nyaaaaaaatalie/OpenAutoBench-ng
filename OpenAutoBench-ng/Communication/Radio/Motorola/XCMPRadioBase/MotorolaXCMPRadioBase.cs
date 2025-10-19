@@ -215,6 +215,18 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             }
         }
 
+        /// <summary>
+        /// Softpot Parameters Struct
+        /// </summary>
+        public struct SoftpotParams
+        {
+            public int Min { get; set; }
+            public int Max { get; set; }
+            public int[] Frequencies { get; set; }
+            public int ByteLength { get; set; }
+            public int[] Values { get; set; }
+        }
+
         public MotorolaXCMPRadioBase(IXCMPRadioConnection conn)
         {
             Name = "";
@@ -248,6 +260,61 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         {
             // We reverse the byte order to get the endianness correct
             return BitConverter.GetBytes((UInt32)frequency / 5).Reverse().ToArray();
+        }
+
+        /// <summary>
+        /// Convert an array of bytes to an integer value
+        /// </summary>
+        /// <param name="bytes">bytes to convert</param>
+        /// <returns>converted integer value</returns>
+        /// <exception cref="NotImplementedException">if byte size is not 8, 4, 2, or 1</exception>
+        public static int SoftpotBytesToValue(byte[] bytes)
+        {
+            // flip byte array since softpot bytes are little-endian
+            bytes = bytes.Reverse().ToArray();
+            // Convert
+            switch (bytes.Length)
+            {
+                case 4:
+                    return BitConverter.ToInt32(bytes);
+                case 2:
+                    return BitConverter.ToInt16(bytes);
+                case 1:
+                    return bytes[0];
+                default:
+                    throw new NotImplementedException($"Value byte length of {bytes.Length} not supported!");
+            }
+        }
+
+        /// <summary>
+        /// Convert an integer value to an array of bytes
+        /// </summary>
+        /// <param name="val">value to convert</param>
+        /// <returns>byte array</returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public static byte[] SoftpotValueToBytes(int val, int byteLen)
+        {
+            // Bytes holder
+            byte[] bytes;
+            // Convert
+            switch (byteLen)
+            {
+                case 4:
+                    bytes = BitConverter.GetBytes(val);
+                    break;
+                case 2:
+                    bytes = BitConverter.GetBytes((short)val);
+                    break;
+                case 1:
+                    bytes = new byte[] { (byte)val };
+                    break;
+                default:
+                    throw new NotImplementedException($"Value byte length of {byteLen} not supported!");
+            }
+            // Swap for little-endian
+            bytes = bytes.Reverse().ToArray();
+            // Return
+            return bytes;
         }
 
         /// <summary>
@@ -320,7 +387,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         public XcmpMessage Send(XcmpMessage message, int timeout = 1)
         {
             // Send the message
-            Console.WriteLine("XCMP: >>SNT>> " + Convert.ToHexString(message.Bytes));
+            //Console.WriteLine("XCMP: >>SNT>> " + Convert.ToHexString(message.Bytes));
             _connection.Send(message.Bytes);
             
             // Get the response
@@ -330,7 +397,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 // Get the response
                 byte[] rx = _connection.Receive();
                 XcmpMessage response = new XcmpMessage(rx);
-                Console.WriteLine("XCMP: <<RCV<< " + Convert.ToHexString(response.Bytes));
+                //Console.WriteLine("XCMP: <<RCV<< " + Convert.ToHexString(response.Bytes));
 
                 // Validate it's a response
                 if (response.MsgType != MsgType.RESPONSE)
@@ -373,7 +440,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
             Array.Copy(data, 0, toSend, 2, dataLen);
 
-            Console.WriteLine("XCMP: >>SNT>> " + Convert.ToHexString(toSend));
+            //Console.WriteLine("XCMP: >>SNT>> " + Convert.ToHexString(toSend));
 
             _connection.Send(toSend);
 
@@ -389,7 +456,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 len |= (fromRadio[0] << 8) & 0xFF;
                 len |= fromRadio[1];
 
-                Console.WriteLine("XCMP: <<RCV<< " + Convert.ToHexString(fromRadio.Take(len + 2).ToArray()));
+                //Console.WriteLine("XCMP: <<RCV<< " + Convert.ToHexString(fromRadio.Take(len + 2).ToArray()));
 
                 byte[] retval = new byte[len];
 
@@ -650,6 +717,46 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             SendSoftpot(msg);
         }
 
+        /// <summary>
+        /// Return all values for a softpot type as a list of byte arrays
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="byteLen"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public List<byte[]> SoftpotReadAll(SoftpotType type, int byteLen)
+        {
+            Console.Write($"XCMP: reading all softpot values for softpot {Enum.GetName(type)} ({byteLen} bytes each");
+
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ_ALL, type);
+
+            SoftpotMessage resp = SendSoftpot(msg);
+
+            // Validate
+            if (resp.Value.Length % byteLen != 0)
+                throw new Exception($"Softpot value array not an even multiple of byte length!");
+
+            // Determine number of values in response
+            int n_vals = (int)(resp.Value.Length / byteLen);
+
+            // List
+            List<byte[]> values = new List<byte[]>();
+            
+            // Iterate
+            for (int i = 0; i < n_vals; i++)
+            {
+                byte[] value = resp.Value.Skip(i * byteLen).Take(byteLen).ToArray();
+                values.Add(value);
+            }
+
+            return values;
+        }
+
+        /// <summary>
+        /// Read all frequencies associated with a softpot type
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
         public int[] SoftpotReadAllFrequencies(SoftpotType type)
         {
             Console.WriteLine($"XCMP: reading all softpot frequencies for softpot {Enum.GetName(type)}");
@@ -791,6 +898,43 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             }
             // Return the percentage of bit errors
             return (totalBitErrors / totalBits);
+        }
+
+        /// <summary>
+        /// Retrieve the softpot parameters for a softpot from the radio
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public SoftpotParams SoftpotGetParams(SoftpotType type)
+        {
+            // New struct
+            SoftpotParams p = new SoftpotParams();
+
+            // Read frequencies
+            p.Frequencies = SoftpotReadAllFrequencies(type);
+
+            // Get min/max/byte length
+            byte[] min = SoftpotGetMinimum(type);
+            p.Min = SoftpotBytesToValue(min);
+            p.Max = SoftpotBytesToValue(SoftpotGetMaximum(type));
+            p.ByteLength = min.Length;
+
+            // Get initial values
+            List<byte[]> vals = SoftpotReadAll(type, p.ByteLength);
+
+            // Validate
+            if (vals.Count != p.Frequencies.Length)
+                throw new Exception($"Did not get expected number of softpot values for frequencies (Got {vals.Count}, Expected {p.Frequencies.Length}");
+
+            // Add to list
+            p.Values = new int[vals.Count];
+            for (int i = 0; i < vals.Count; i++)
+            {
+                p.Values[i] = SoftpotBytesToValue(vals[i]);
+            }
+
+            // Return
+            return p;
         }
 
     }

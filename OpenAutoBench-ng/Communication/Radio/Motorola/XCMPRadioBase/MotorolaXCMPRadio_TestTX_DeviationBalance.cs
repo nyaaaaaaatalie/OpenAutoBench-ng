@@ -9,7 +9,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         // private vars specific to test
         protected MotorolaXCMPRadioBase Radio;
 
-        protected int[] TXFrequencies;
+        // Test Parameters
+        MotorolaXCMPRadioBase.SoftpotParams ModBalParams;
 
         protected int[] CharPoints;
 
@@ -26,46 +27,57 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         public override async Task Setup()
         {
             LogCallback(String.Format("Setting up for {0}", Name));
+
+            // Get softpot parameters
+            ModBalParams = Radio.SoftpotGetParams(SoftpotType.ModBalance);
+
+            // Configure Instrument
             await Instrument.SetDisplay(InstrumentScreen.Monitor);
             await Task.Delay(1000, Ct);
             await Instrument.SetupTXDeviationTest();
             await Task.Delay(1000, Ct);
         }
 
+        private async Task PerformDeviationBalanceTest(int frequency, int softpotValue)
+        {
+            Radio.SetTXFrequency(frequency, Bandwidth.BW_25kHz, TxDeviation.NoModulation);
+            await Instrument.SetRxFrequency(frequency, testMode.ANALOG);
+            // low tone
+            Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_LOW);
+            Radio.SetTransmitPower(TxPowerLevel.Low);
+            Radio.Keyup();
+            Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(softpotValue, 4));
+            await Task.Delay(6000, Ct);
+            float measDevLow = await Instrument.MeasureFMDeviation();
+            measDevLow = (float)Math.Round(measDevLow);
+            LogCallback(String.Format("TX Deviation Point at {0}MHz (low tone): {1}hz", (frequency / 1000000F), measDevLow));
+            Radio.Dekey();
+            await Task.Delay(500, Ct);
+
+            // high tone
+            Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_HIGH);
+            Radio.Keyup();
+            Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(softpotValue, 4));
+            await Task.Delay(6000, Ct);
+            float measDevHigh = await Instrument.MeasureFMDeviation();
+            measDevHigh = (float)Math.Round(measDevHigh);
+            LogCallback(String.Format("TX Deviation Point at {0}MHz (high tone): {1}hz", (frequency / 1000000F), measDevHigh));
+            Radio.Dekey();
+
+            // percentage difference
+            float percentDifference = (measDevHigh - measDevLow) / measDevLow * 100;
+            Report.AddResult(OpenAutoBench.ResultType.TX_DEVIATION_BAL, percentDifference, 0.0, -1.5, 1.5, frequency);
+            LogCallback(String.Format("Variance between high tone and low tone at {0}MHz: {1}%", (frequency / 1000000F), Math.Round(percentDifference, 2)));
+        }
+
         public override async Task PerformTest()
         {
             try
             {
-                for (int i = 0; i < TXFrequencies.Length; i++)
+                for (int i = 0; i < ModBalParams.Frequencies.Length; i++)
                 {   
-                    int currFreq = TXFrequencies[i];
-                    Radio.SetTXFrequency(currFreq, Bandwidth.BW_25kHz, TxDeviation.NoModulation);
-                    await Instrument.SetRxFrequency(currFreq, testMode.ANALOG);
-                    // low tone
-                    Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_LOW);
-                    Radio.SetTransmitPower(TxPowerLevel.Low);
-                    Radio.Keyup();
-                    await Task.Delay(10000, Ct);
-                    float measDevLow = await Instrument.MeasureFMDeviation();
-                    measDevLow = (float)Math.Round(measDevLow);
-                    LogCallback(String.Format("TX Deviation Point at {0}MHz (low tone): {1}hz", (currFreq / 1000000F), measDevLow));
-                    Radio.Dekey();
-                    await Task.Delay(1000, Ct);
-
-                    // high tone
-                    Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_HIGH);
-                    Radio.Keyup();
-                    await Task.Delay(10000, Ct);
-                    float measDevHigh = await Instrument.MeasureFMDeviation();
-                    measDevHigh = (float)Math.Round(measDevHigh);
-                    LogCallback(String.Format("TX Deviation Point at {0}MHz (high tone): {1}hz", (currFreq / 1000000F), measDevHigh));
-                    Radio.Dekey();
-
-                    // percentage difference
-                    float percentDifference = (measDevHigh - measDevLow) / measDevLow * 100;
-                    Report.AddResult(OpenAutoBench.ResultType.TX_DEVIATION_BAL, percentDifference, 0.0, -1.5, 1.5, currFreq);
-                    LogCallback(String.Format("Variance between high tone and low tone at {0}MHz: {1}%", (currFreq / 1000000F), Math.Round(percentDifference, 2)));
-                    await Task.Delay(1000, Ct);
+                    await PerformDeviationBalanceTest(ModBalParams.Frequencies[i], ModBalParams.Values[i]);
+                    await Task.Delay(500, Ct);
                 }
             }
             catch (Exception ex)
@@ -104,24 +116,26 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
             try
             {
-                foreach (int Frequency in TXFrequencies)
+                for (int i = 0; i < ModBalParams.Frequencies.Length; i++)
                 {
-                    LogCallback($"Starting deviation balance alignment for frequency {Frequency / 1E6:F5} MHz");
+                    LogCallback($"Starting deviation balance alignment for frequency {ModBalParams.Frequencies[i] / 1E6:F5} MHz");
 
                     // Setup Instrument
-                    await Instrument.SetRxFrequency(Frequency, testMode.ANALOG);
+                    await Instrument.SetRxFrequency(ModBalParams.Frequencies[i], testMode.ANALOG);
 
                     // Wait for things to settle
                     await Task.Delay(500, Ct);
 
                     // Measure fixed low deviation value
-                    Radio.SetTXFrequency(Frequency, Bandwidth.BW_25kHz, TxDeviation.NoModulation);
+                    Radio.SetTXFrequency(ModBalParams.Frequencies[i], Bandwidth.BW_25kHz, TxDeviation.Default);
                     Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_LOW);
-                    Radio.Keyup();
-                    await Task.Delay(5000, Ct);
+                    Radio.SetTransmitPower(TxPowerLevel.Low);
+                    Radio.Keyup(TxMicrophone.InternalMuted);
+                    Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(ModBalParams.Values[i], 4));
+                    await Task.Delay(6000, Ct);
                     float measDevLow = await Instrument.MeasureFMDeviation();
                     measDevLow = (float)Math.Round(measDevLow);
-                    LogCallback($"Low tone deviation at {Frequency} MHz: {measDevLow} Hz");
+                    LogCallback($"Low tone deviation at {ModBalParams.Frequencies[i]} MHz: {measDevLow} Hz");
                     Radio.Dekey();
                     await Task.Delay(500, Ct);
 
@@ -129,17 +143,19 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     TuningLoops.SoftpotTuningLoop loop = new TuningLoops.SoftpotTuningLoop(
                         Radio,
                         SoftpotType.ModBalance,
+                        new Range<int>(ModBalParams.Min, ModBalParams.Max),
+                        ModBalParams.ByteLength,
                         () => measureDeviationBalance(measDevLow),
                         0.0,                                // target is 0% difference
-                        1.0,                                // 1.5% is the Moto spec so 1.0 is our limit for success
+                        0.75,                               // 1.5% is the Moto spec so 1.0 is our limit for success
+                        10.0,                               // Softpot variance target
                         new Range<double>(-25.0, 25.0),     // +/- 25% seems reasonable
                         new PIDGains(-0.2, 0.0, 0.0),       // SWAG value
-                        2000,                               // Wait 2 seconds for each measurement
-                        30,                                 // 30 second tuning loop timeout
+                        3000,                               // Wait 2 seconds for each measurement
+                        60,                                 // 30 second tuning loop timeout
                         LogCallback,
                         Ct
                     );
-
                     loop.Setup();
 
                     // Setup for high deviation
@@ -148,32 +164,38 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     // Key radio
                     Radio.Keyup();
 
+                    // Update initial softpot value
+                    Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(ModBalParams.Values[i], 4));
+
                     // Wait
-                    await Task.Delay(3000, Ct);
+                    await Task.Delay(2500, Ct);
 
                     // Perform tuning
                     bool result = await loop.Tune();
 
-                    // Take final measurement if tuning succeeded
-                    if (result)
-                    {
-                        await Task.Delay(3000, Ct);
-                        float measBalance = await measureDeviationBalance(measDevLow);
-                        Report.AddResult(ResultType.TX_DEVIATION_BAL, measBalance, 0.0, -1.5, 1.5, Frequency);
-                        LogCallback(String.Format("Measured deviation balance at {0} MHz: {1}%", (Frequency / 1000000F), measBalance));
-                    }
-                    else
-                    {
-                        Report.AddError(ResultType.REF_OSC, "Alignment for Reference Oscillator Failed");
-                        LogCallback("Alignment for Reference Oscillator Failed");
-                    }
-
                     // Dekey
                     Radio.Dekey();
 
+                    // Take final measurement if tuning succeeded
+                    if (result)
+                    {
+                        // Wait
+                        await Task.Delay(1000, Ct);
+                        // Take Measurement
+                        LogCallback($"Taking final deviation balance measurement for frequency {ModBalParams.Frequencies[i] / 1e6F:0.00000} MHz");
+                        await PerformDeviationBalanceTest(ModBalParams.Frequencies[i], (int)loop.FinalSoftpotValue);
+                    }
+                    else
+                    {
+                        Report.AddError(ResultType.TX_DEVIATION_BAL, $"Alignment for Reference Oscillator Failed ({ModBalParams.Frequencies[i] / 1e6F:0.00000} MHz)");
+                        LogCallback($"Alignment for Reference Oscillator Failed ({ModBalParams.Frequencies[i] / 1e6F:0.00000} MHz)");
+                    }
+
+                    
+
                     // Let the radio rest for 5 seconds
-                    LogCallback("Letting radio cooldown for 5sec...");
-                    await Task.Delay(5000, Ct);
+                    LogCallback("Letting radio cooldown...");
+                    await Task.Delay(2500, Ct);
                 }
             }
             catch (Exception ex)
