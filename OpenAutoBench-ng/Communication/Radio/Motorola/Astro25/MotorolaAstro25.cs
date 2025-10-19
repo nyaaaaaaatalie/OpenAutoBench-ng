@@ -1,4 +1,5 @@
-﻿using OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase;
+﻿using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
+using OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase;
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.Astro25
 {
@@ -53,46 +54,22 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.Astro25
 
         public override int[] GetTXPowerPoints()
         {
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ, SoftpotType.TxPowerCharPoint);
+
+            SoftpotMessage resp = SendSoftpot(msg);
+
             byte[] cmd = new byte[4];
 
-            // softpot opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x01;
+            int[] returnVal = new int[resp.Value.Length / 2];
 
-            cmd[2] = 0x00;
+            returnVal[0] |= (resp.Value[0] << 8);
+            returnVal[0] |= resp.Value[1];
 
-            cmd[3] = 0x11;  // get TX power characterization points
-
-            byte[] temp = Send(cmd);
-
-            byte[] result = new byte[temp.Length - 5];
-            Array.Copy(temp, 5, result, 0, temp.Length - 5);
-
-            int[] returnVal = new int[result.Length / 2];
-
-            returnVal[0] |= (result[0] << 8);
-            returnVal[0] |= result[1];
-
-            returnVal[1] |= (result[2] << 8);
-            returnVal[1] |= result[3];
+            returnVal[1] |= (resp.Value[2] << 8);
+            returnVal[1] |= resp.Value[3];
 
             return returnVal;
         }
-
-        public override MotorolaBand[] GetBands()
-        {
-            byte[] fromRadio = GetVersion(VersionOperation.RFBand);
-            byte[] bands = new byte[fromRadio.Length - 3];
-            List<MotorolaBand> bandList = new List<MotorolaBand>();
-
-            Array.Copy(fromRadio, 3, bands, 0, fromRadio.Length - 3);
-            foreach (byte b in bands)
-            {
-                bandList.Add((MotorolaBand)b);
-            }
-            return bandList.ToArray();
-        }
-
         
     }
 }

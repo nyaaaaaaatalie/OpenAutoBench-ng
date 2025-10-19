@@ -37,13 +37,13 @@ public class MotorolaXCMPRadio_TestRX_RSSI : IBaseTest
             {
                 int currFreq = TXFrequencies[i];
                 Radio.SetReceiveConfig(XCMPRadioReceiveOption.CSQ);
-                Radio.SetRXFrequency(currFreq, false);
+                Radio.SetRXFrequency(currFreq, Bandwidth.BW_25kHz, RxModulation.C4FM);
                 await Instrument.SetTxFrequency(currFreq);
 
                 await Task.Delay(5000, Ct);
                 await Instrument.GenerateSignal(-47); //For future version, this should be a customizable value
                 await Task.Delay(5000, Ct);
-                byte rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI)[0];
+                byte rssi = Radio.GetStatus(StatusOperation.RSSI)[0];
 
                 await Instrument.StopGenerating();
                 Report.AddResult(OpenAutoBench.ResultType.RSSI, (float)rssi, 150, 150, 255, currFreq);

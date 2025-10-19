@@ -39,7 +39,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 for (int i = 0; i < TXFrequencies.Length; i++)
                 {   
                     int currFreq = TXFrequencies[i];
-                    Radio.SetTXFrequency(currFreq, false);
+                    Radio.SetTXFrequency(currFreq, Bandwidth.BW_25kHz, TxDeviation.NoModulation);
                     await Instrument.SetRxFrequency(currFreq, testMode.ANALOG);
                     // low tone
                     Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_LOW);
@@ -114,7 +114,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     await Task.Delay(500, Ct);
 
                     // Measure fixed low deviation value
-                    Radio.SetTXFrequency(Frequency, false);
+                    Radio.SetTXFrequency(Frequency, Bandwidth.BW_25kHz, TxDeviation.NoModulation);
                     Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_LOW);
                     Radio.Keyup();
                     await Task.Delay(5000, Ct);
@@ -127,7 +127,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     // Create and setup softpot tuning loop
                     TuningLoops.SoftpotTuningLoop loop = new TuningLoops.SoftpotTuningLoop(
                         Radio,
-                        MotorolaXCMPRadioBase.SoftpotType.ModBalance,
+                        SoftpotType.ModBalance,
                         () => measureDeviationBalance(measDevLow),
                         0.0,                                // target is 0% difference
                         1.0,                                // 1.5% is the Moto spec so 1.0 is our limit for success

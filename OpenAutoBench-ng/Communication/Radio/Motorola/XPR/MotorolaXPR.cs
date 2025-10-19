@@ -49,27 +49,16 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XPR
 
         public override int[] GetTXPowerPoints()
         {
-            byte[] cmd = new byte[4];
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ_ALL, SoftpotType.TxPowerCharPoint);
 
-            // softpot opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x01;
+            SoftpotMessage resp = SendSoftpot(msg);
 
-            cmd[2] = 0x03;  // readall
-
-            cmd[3] = 0x11;  // get TX power characterization points
-
-            byte[] temp = Send(cmd);
-
-            byte[] result = new byte[temp.Length - 5];
-            Array.Copy(temp, 5, result, 0, temp.Length - 5);
-
-            int[] returnVal = new int[result.Length / 2];
+            int[] returnVal = new int[resp.Value.Length / 2];
 
             for (int i = 0; i < returnVal.Length; i++)
             {
-                returnVal[i] |= (result[i * 2] << 8);
-                returnVal[i] |= result[(i * 2) + 1];
+                returnVal[i] |= (resp.Value[i * 2] << 8);
+                returnVal[i] |= resp.Value[(i * 2) + 1];
             }
 
             return returnVal;

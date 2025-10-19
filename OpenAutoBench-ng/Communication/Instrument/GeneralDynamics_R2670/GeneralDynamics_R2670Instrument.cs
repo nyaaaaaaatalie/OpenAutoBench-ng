@@ -23,7 +23,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
         private int txFreq;
 
 
-        public GeneralDynamics_R2670Instrument(IInstrumentConnection conn, int addr)
+        public GeneralDynamics_R2670Instrument(IInstrumentConnection conn)
         {
             Connected = false;
             Connection = conn;

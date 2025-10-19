@@ -74,13 +74,13 @@
 
     // Callback to monitor the code text box for auto-scroll
     function scrollCallback(mutationList, observer) {
-        for (const mutation of mutationList)
-        {
-            if (mutation.type === "childList")
-            {
-                testOutput.scrollTop = testOutput.scrollHeight;
-            }
-        }
+    for (const mutation of mutationList)
+    {
+    if (mutation.type === "childList")
+    {
+    testOutput.scrollTop = testOutput.scrollHeight;
+    }
+    }
     }
 
     // Create observer
@@ -128,8 +128,8 @@
             radio = new MotorolaAPX(conn);
             radio.Connect();
             await Task.Delay(500, ctSource.Token);
-            radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.SerialNumber);
-            radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.ModelNumber);
+            radio.GetStatus(StatusOperation.SerialNumber);
+            radio.GetStatus(StatusOperation.ModelNumber);
             updateOutput($"Connected to Motorola {radio.ModelNumber} (S/N {radio.SerialNumber})");
         }
         catch (Exception e)
@@ -325,6 +325,7 @@
     public void updateOutput(string line)
     {
         TestOutput += line + "<br>";
+        Console.WriteLine("LOG: " + line);
         InvokeAsync(StateHasChanged);
     }
 

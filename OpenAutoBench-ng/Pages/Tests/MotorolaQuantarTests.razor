@@ -167,6 +167,7 @@
     public void updateOutput(string line)
     {
         TestOutput += line + "<br>";
+        Console.WriteLine("LOG: " + line);
         InvokeAsync(StateHasChanged);
     }
 

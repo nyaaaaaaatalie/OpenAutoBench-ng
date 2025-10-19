@@ -11,8 +11,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         protected int[] CharPoints;
 
-        private int SOFTPOT_TX_CHAR_POINTS = 0x11;
-
         public MotorolaXCMPRadio_TestTX_PowerCharacterization(XCMPRadioTestParams testParams) : base("TX: Power Characterization", testParams.report, testParams.instrument, testParams.callback, testParams.ct)
         {
             Radio = testParams.radio;
@@ -32,6 +30,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             await Instrument.SetupTXPowerTest();
             await Task.Delay(1000, Ct);
             CharPoints = Radio.GetTXPowerPoints();
+            Console.WriteLine($"Got TX power characterization points: {CharPoints.ToString()}");
         }
 
         public override async Task PerformTest()
@@ -40,13 +39,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             {
                 for (int i = 0; i < TXFrequencies.Length; i++)
                 {
-                    Radio.SetTXFrequency(TXFrequencies[i], false);
+                    Radio.SetTXFrequency(TXFrequencies[i], Bandwidth.BW_25kHz, TxDeviation.NoModulation);
                     await Instrument.SetRxFrequency(TXFrequencies[i], testMode.ANALOG);
 
                     // low power
                     Radio.Keyup();
                     await Task.Delay(500, Ct);
-                    Radio.SoftpotUpdate(MotorolaXCMPRadioBase.SoftpotType.TxPower, BitConverter.GetBytes((UInt16)CharPoints[i * 2]));
+                    Radio.SoftpotUpdate(SoftpotType.TxPower, BitConverter.GetBytes((UInt16)CharPoints[i * 2]));
                     await Task.Delay(5000, Ct);
                     float measPow = await Instrument.MeasurePower();
                     measPow = (float)Math.Round(measPow, 2);
@@ -59,7 +58,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     // high power
                     Radio.Keyup();
                     await Task.Delay(500, Ct);
-                    Radio.SoftpotUpdate(MotorolaXCMPRadioBase.SoftpotType.TxPower, BitConverter.GetBytes((UInt16)CharPoints[i * 2 + 1]));
+                    Radio.SoftpotUpdate(SoftpotType.TxPower, BitConverter.GetBytes((UInt16)CharPoints[i * 2 + 1]));
                     await Task.Delay(5000, Ct);
                     measPow = await Instrument.MeasurePower();
                     measPow = (float)Math.Round(measPow, 2);

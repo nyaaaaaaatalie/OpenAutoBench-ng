@@ -65,7 +65,7 @@
             radio = new MotorolaXPR(conn);
             radio.Connect();
             await Task.Delay(500);
-            radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.SerialNumber);
+            radio.GetStatus(StatusOperation.SerialNumber);
             updateOutput($"Connected to {radio.SerialNumber} ({radio.ModelNumber})");
     }
         catch (Exception e)
@@ -134,6 +134,7 @@
     public void updateOutput(string line)
     {
         TestOutput += line + "<br>";
+        Console.WriteLine("LOG: " + line);
         InvokeAsync(StateHasChanged);
     }
 

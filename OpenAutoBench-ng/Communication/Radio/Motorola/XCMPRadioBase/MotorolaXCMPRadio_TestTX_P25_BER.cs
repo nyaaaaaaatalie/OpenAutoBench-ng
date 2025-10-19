@@ -40,7 +40,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     await Task.Delay(500, Ct);
                     foreach (int TXFrequency in TXFrequencies)
                     {
-                        Radio.SetTXFrequency(TXFrequency, true);
+                        Radio.SetTXFrequency(TXFrequency, Bandwidth.BW_25kHz, TxDeviation.Default);
                         await Instrument.SetRxFrequency(TXFrequency, testMode.P25);
                         Radio.Keyup();
                         await Task.Delay(1500, Ct);

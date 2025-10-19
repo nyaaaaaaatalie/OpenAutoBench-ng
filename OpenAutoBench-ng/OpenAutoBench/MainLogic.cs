@@ -49,7 +49,7 @@ namespace OpenAutoBench_ng.OpenAutoBench
             {
                 case Settings.InstrumentConnectionTypeEnum.Serial:
                     connection = new SerialConnection(settings.SerialPort, settings.SerialBaudrate, settings.SerialNewline, settings.SerialDTR);
-                    System.Diagnostics.Debug.WriteLine($"Creating new serial instrument connection to {settings.SerialPort} at {settings.SerialBaudrate} baud");
+                    Console.WriteLine($"Creating new serial instrument connection to {settings.SerialPort} at {settings.SerialBaudrate} baud");
                     break;
                 case Settings.InstrumentConnectionTypeEnum.IP:
                     if (string.IsNullOrEmpty(settings.IPAddress))
@@ -57,13 +57,13 @@ namespace OpenAutoBench_ng.OpenAutoBench
                     if (settings.IPPort <= 0)
                         throw new Exception("IP port cannot be <= 0");
                     connection = new IPConnection(settings.IPAddress, settings.IPPort);
-                    System.Diagnostics.Debug.WriteLine($"Creating new IP instrument connection to {settings.IPAddress}:{settings.IPPort}");
+                    Console.WriteLine($"Creating new IP instrument connection to {settings.IPAddress}:{settings.IPPort}");
                     break;
                 case Settings.InstrumentConnectionTypeEnum.VISA:
                     if (string.IsNullOrEmpty(settings.VISAResourceName))
                         throw new Exception("VISA resource name cannot be blank!");
                     connection = new VISAConnection(settings.VISAResourceName);
-                    System.Diagnostics.Debug.WriteLine($"Creating new VISA instrument connection to {settings.VISAResourceName}");
+                    Console.WriteLine($"Creating new VISA instrument connection to {settings.VISAResourceName}");
                     break;
                 default:
                     throw new Exception("Unsupported connection type. Dying.");

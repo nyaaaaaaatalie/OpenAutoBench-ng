@@ -38,7 +38,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         {
             try
             {
-                radio.SetTXFrequency(TXFrequency, false);
+                radio.SetTXFrequency(TXFrequency, Bandwidth.BW_25kHz, TxDeviation.NoModulation);
                 await Instrument.SetRxFrequency(TXFrequency, testMode.ANALOG);
                 radio.Keyup();
                 await Task.Delay(5000, Ct);
@@ -69,7 +69,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 // Create and setup softpot tuning loop
                 TuningLoops.SoftpotTuningLoop loop = new TuningLoops.SoftpotTuningLoop(
                     radio,
-                    MotorolaXCMPRadioBase.SoftpotType.RefOsc,
+                    SoftpotType.RefOsc,
                     Instrument.MeasureFrequencyError,
                     0.0,                                // target is 0 Hz frequency error
                     10.0,                               // most instruments should be able to maintain accuracy to within +/- 10 Hz
@@ -87,7 +87,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 await Instrument.SetRxFrequency(TXFrequency, testMode.ANALOG);
 
                 // Setup radio
-                radio.SetTXFrequency(TXFrequency, false);
+                radio.SetTXFrequency(TXFrequency, Bandwidth.BW_25kHz, TxDeviation.NoModulation);
 
                 // Key radio
                 radio.Keyup();

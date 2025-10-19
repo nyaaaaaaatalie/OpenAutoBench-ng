@@ -38,7 +38,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 for (int i=StartFrequency; i<=EndFrequency; i+=StepFrequency)
                 {
                     Radio.SetTransmitConfig(XCMPRadioTransmitOption.REFOSC);
-                    Radio.SetTXFrequency(i, false);
+                    Radio.SetTXFrequency(i, Bandwidth.BW_25kHz, TxDeviation.NoModulation);
                     await Instrument.SetRxFrequency(i, testMode.ANALOG);
                     Radio.Keyup();
                     await Task.Delay(5000, Ct);

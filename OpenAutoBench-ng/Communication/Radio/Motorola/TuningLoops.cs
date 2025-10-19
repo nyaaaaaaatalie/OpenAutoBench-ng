@@ -34,13 +34,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             public MotorolaXCMPRadioBase Radio { get; private set; }
 
             // The softpot we're adjusting
-            public MotorolaXCMPRadioBase.SoftpotType SoftpotType { get; private set; }
+            public SoftpotType SoftpotType { get; private set; }
 
             // Name of the softpot
             public string SoftpotName { 
                 get
                 {
-                    return Enum.GetName(typeof(MotorolaXCMPRadioBase.SoftpotType), SoftpotType);
+                    return Enum.GetName(typeof(SoftpotType), SoftpotType);
                 } 
             }
 
@@ -104,7 +104,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             /// <param name="timeout">tuning routine timeout in seconds</param>
             /// <param name="logCallback">Logging string callback</param>
             /// <param name="ct">Cancellation token</param>
-            public SoftpotTuningLoop(MotorolaXCMPRadioBase radio, MotorolaXCMPRadioBase.SoftpotType softpotType, Func<Task<float>> measFunc, double measTarget, double measTolerance, CSPID.Range<double> measRange, PIDGains gains, int loopTime, uint timeout, Action<string> logCallback, CancellationToken ct)
+            public SoftpotTuningLoop(MotorolaXCMPRadioBase radio, SoftpotType softpotType, Func<Task<float>> measFunc, double measTarget, double measTolerance, CSPID.Range<double> measRange, PIDGains gains, int loopTime, uint timeout, Action<string> logCallback, CancellationToken ct)
             {
                 Radio = radio;
                 SoftpotType = softpotType;
