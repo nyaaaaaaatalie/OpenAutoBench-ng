@@ -32,13 +32,6 @@
             CRLF = 2,
         }
 
-        public enum SerialNewlineType
-        {
-            LF = 0,
-            CR = 1,
-            CRLF = 2,
-        }
-
         public InstrumentConnectionTypeEnum InstrumentConnectionType { get; set; }
 
         /// <summary>
