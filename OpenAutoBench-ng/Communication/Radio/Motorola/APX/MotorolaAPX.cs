@@ -137,46 +137,18 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
 
         public override int[] GetTXPowerPoints()
         {
-            byte[] cmd = new byte[4];
-
-            // softpot opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x01;
-
-            cmd[2] = 0x03;  // readall
-
-            cmd[3] = 0x11;  // get TX power characterization points
-
-            byte[] temp = Send(cmd);
-
-            byte[] result = new byte[temp.Length - 5];
-            Array.Copy(temp, 5, result, 0, temp.Length - 5);
-
-            int[] returnVal = new int[result.Length / 2];
-
-            for (int i = 0; i < returnVal.Length; i++)
-            {
-                returnVal[i] |= (result[i * 2] << 8);
-                returnVal[i] |= result[(i * 2) + 1];
-            }
-
-            return returnVal;
+            Console.WriteLine($"XCMP: reading APX TX power characterization frequencies");
+            return SoftpotReadAllFrequencies(SoftpotType.TxPowerCharPoint);
         }
-
-        public override MotorolaBand[] GetBands()
-        {
-            byte[] fromRadio = GetVersion(VersionOperation.RFBand);
-            byte[] bands = new byte[fromRadio.Length - 3];
-            List<MotorolaBand> bandList = new List<MotorolaBand>();
-
-            Array.Copy(fromRadio, 3, bands, 0, fromRadio.Length - 3);
-            foreach (byte b in bands)
-            {
-                bandList.Add((MotorolaBand)b);
-            }
-            return bandList.ToArray();
-        }
-
         
+        public override void SetTransmitPower(TxPowerLevel power)
+        {
+            // Override low power on APX8000 with low power (new)
+            if (ModelNumber.StartsWith("H91T") && power == TxPowerLevel.Low)
+                base.SetTransmitPower(TxPowerLevel.LowNew);
+            else
+                base.SetTransmitPower(power);
+        }
+
     }
 }

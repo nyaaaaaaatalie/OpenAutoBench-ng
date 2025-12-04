@@ -161,31 +161,31 @@ namespace OpenAutoBench_ng.OpenAutoBench
                 case ResultType.REF_OSC:
                     return new string[] {
                         "Reference Oscillator", $"{MeasuredValue:F2} Hz", $"{TargetValue:F2} Hz",
-                        $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
+                        $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6:0.000000} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.FREQ_ERROR:
                     return new string[] {
                         "Frequency Error", $"{MeasuredValue:F2} Hz", $"{TargetValue:F2} Hz",
-                        $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
+                        $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6:0.000000} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.TX_POWER:
                     return new string[] {
                         "Transmit Power", $"{MeasuredValue:F2} W", TargetValue > 0 ? $"{TargetValue:F2} W" : "N/A",
-                        $"{toleranceString()} W", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
+                        $"{toleranceString()} W", $"{MeasurementFrequency / 1E6:0.000000} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.TX_DEVIATION:
                     return new string[] {
                         "Transmit Deviation", $"{MeasuredValue:F3} Hz", $"{TargetValue:F3} Hz",
-                        $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
+                        $"{toleranceString()} Hz", $"{MeasurementFrequency / 1E6:0.000000} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.TX_DEVIATION_BAL:
                     return new string[] {
                         "Deviation Balance", $"{MeasuredValue:F2}%", $"{TargetValue:F2}%",
-                        $"{toleranceString()} %", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
+                        $"{toleranceString()} %", $"{MeasurementFrequency / 1E6:0.000000} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.BIT_ERROR_RATE:
                     return new string[] {
                         "Bit Error Rate (BER)", $"{MeasuredValue:F2}%", $"{TargetValue:F2}%",
-                        $"{toleranceString()} %", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
+                        $"{toleranceString()} %", $"{MeasurementFrequency / 1E6:0.000000} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 case ResultType.RSSI:
                     return new string[] {
                         "Received Signal Strength", $"{MeasuredValue}", $"{TargetValue}",
-                        $"{toleranceString()}", $"{MeasurementFrequency / 1E6} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
+                        $"{toleranceString()}", $"{MeasurementFrequency / 1E6:0.000000} MHz", $"{Enum.GetName(typeof(Result), Result)}" };
                 default:
                     return new string[6];
             }
@@ -354,7 +354,8 @@ namespace OpenAutoBench_ng.OpenAutoBench
             reportText +=  "~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=\n";
             reportText +=  "| OpenAutoBench-ng Test Report                                                                         |\n";
             reportText +=  "|                                                                                                      |\n";
-            reportText += $"| Radio: {Radio.ModelNumber ?? "No Radio",-23}                                                                       |\n";
+            reportText += $"| Radio: {((Radio != null) ? Radio.ModelNumber : "No Radio"),-30}                                      |\n";
+            reportText += $"| Firmware: {((Radio != null) ? Radio.FirmwareVersion : ""),-30}                                       |\n";
             // Date
             reportText +=  "~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=~=\n";
             reportText += $"| Report Start: {StartTime,-16}  | End: {EndTime,16}  | Duration: {Duration.ToString(@"hh\:mm\:ss")}                 |\n";

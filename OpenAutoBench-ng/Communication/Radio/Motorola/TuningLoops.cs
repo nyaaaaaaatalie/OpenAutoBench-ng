@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Binders;
 using OpenAutoBench_ng.Communication.Radio;
 using OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase;
 using OpenAutoBench_ng.OpenAutoBench;
@@ -34,13 +35,13 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             public MotorolaXCMPRadioBase Radio { get; private set; }
 
             // The softpot we're adjusting
-            public MotorolaXCMPRadioBase.SoftpotType SoftpotType { get; private set; }
+            public SoftpotType SoftpotType { get; private set; }
 
             // Name of the softpot
             public string SoftpotName { 
                 get
                 {
-                    return Enum.GetName(typeof(MotorolaXCMPRadioBase.SoftpotType), SoftpotType);
+                    return Enum.GetName(typeof(SoftpotType), SoftpotType);
                 } 
             }
 
@@ -53,11 +54,25 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             // Measurement tolerance
             public double MeasTolerance { get; private set; }
 
+            // Softpot Adjustment Variance Tolerance
+            public double VarTolerance { get; private set; }
+
+            // The final softpot value after tuning
+            public byte[] FinalSoftpotBytes { get; private set; }
+            public double FinalSoftpotValue
+            {
+                get
+                {
+                    return MotorolaXCMPRadioBase.SoftpotBytesToValue(FinalSoftpotBytes);
+                }
+            }
+            
+
             // Log print callback
             public Action<string> LogCallback { get; private set; }
 
-            // The byte length of the softpot value (variable, so we determine it by reading the softpots first)
-            private uint spByteLength = 4;
+            // The byte length of the softpot value
+            int spByteLength;
 
             // Softpot min/max limits
             private int softpotMin;
@@ -78,8 +93,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             // Whether we've been setup
             private bool setup = false;
 
-            // Moving average for error measurement
+            // Moving average for error measurement (we want to minimize this)
             private OABMath.MovingAverage errAvg = new OABMath.MovingAverage(5);
+
+            // Variance measurement for softpot adjustments (we want to minimize this)
+            private OABMath.Variance softpotVariance = new OABMath.Variance(5);
 
             // Minimum iterations
             private int minIterations = 3;
@@ -95,27 +113,44 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             /// </summary>
             /// <param name="radio">The radio to tune</param>
             /// <param name="softpotType">softpot to adjust</param>
+            /// <param name="softpotRange">softpot min/max values</param>
+            /// <param name="softpotByteLength">softpot value byte length</param>
             /// <param name="measFunc">function which returns the measurement</param>
             /// <param name="measTarget">target measurement value</param>
             /// <param name="measTolerance">measurement +/- tolerance</param>
+            /// <param name="varTolerance">softpot adjustment variance tolerance</param>
             /// <param name="measRange">Expected range of the measurement value</param>
             /// <param name="gains">PID loop gains</param>
             /// <param name="loopTime">Time to wait after each measurement loop, in ms</param>
             /// <param name="timeout">tuning routine timeout in seconds</param>
             /// <param name="logCallback">Logging string callback</param>
             /// <param name="ct">Cancellation token</param>
-            public SoftpotTuningLoop(MotorolaXCMPRadioBase radio, MotorolaXCMPRadioBase.SoftpotType softpotType, Func<Task<float>> measFunc, double measTarget, double measTolerance, CSPID.Range<double> measRange, PIDGains gains, int loopTime, uint timeout, Action<string> logCallback, CancellationToken ct)
+            public SoftpotTuningLoop(
+                MotorolaXCMPRadioBase radio, 
+                SoftpotType softpotType,
+                CSPID.Range<int> softpotRange,
+                int softpotByteLength,
+                Func<Task<float>> measFunc, 
+                double measTarget, double measTolerance, double varTolerance, CSPID.Range<double> measRange,
+                PIDGains gains, int loopTime, uint timeout, 
+                Action<string> logCallback, CancellationToken ct
+                )
             {
                 Radio = radio;
                 SoftpotType = softpotType;
                 MeasFunc = measFunc;
                 MeasTarget = measTarget;
                 MeasTolerance = measTolerance;
+                VarTolerance = varTolerance;
                 iterDelay = loopTime;
                 timeOut = timeout * 1000;
                 this.gains = gains;
                 LogCallback = logCallback;
                 this.ct = ct;
+
+                softpotMin = softpotRange.Minimum;
+                softpotMax = softpotRange.Maximum;
+                spByteLength = softpotByteLength;
 
                 // Calculate error range from provided measurement range
                 double measAvg = (measRange.Maximum + measRange.Minimum) / 2;
@@ -128,12 +163,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
             /// <returns></returns>
             public void Setup()
             {
-                // Read the softpot current value and determine the softpot value byte length
-                byte[] valueBytes = Radio.SoftpotGetValue(SoftpotType);
-                spByteLength = (uint)valueBytes.Length;
-                // Get the softpot min & max values
-                softpotMin = spBytesToVal(Radio.SoftpotGetMinimum(SoftpotType));
-                softpotMax = spBytesToVal(Radio.SoftpotGetMaximum(SoftpotType));
                 // Calculate control range from softpot min/max
                 double softpotAvg = (softpotMin + softpotMax) / 2;
                 CSPID.Range<double> cRange = new CSPID.Range<double>(softpotMin - softpotAvg, softpotMax - softpotAvg);
@@ -169,7 +198,10 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
 
                 // Read initial softpot value
                 byte[] softpotBytes = Radio.SoftpotGetValue(SoftpotType);
-                double softpotValue = spBytesToVal(softpotBytes);
+                double softpotValue = MotorolaXCMPRadioBase.SoftpotBytesToValue(softpotBytes);
+
+                // Set initial softpot variance sample
+                softpotVariance.Add(softpotValue);
 
                 LogCallback($"Starting softpot value for {SoftpotName}: {softpotValue}");
 
@@ -193,10 +225,10 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
                     errAvg.Add(Math.Abs(error));
 
                     // Exit loop if we achieved our target
-                    if (errAvg.Value <= MeasTolerance && i >= minIterations)
+                    if (errAvg.Value <= MeasTolerance && softpotVariance.Value <= VarTolerance && i >= minIterations)
                     {
                         // Debug print
-                        Console.WriteLine($"Softpot tuning loop for {SoftpotName} hit threshold of <= {MeasTolerance:F3}, exiting tune loop!");
+                        Console.WriteLine($"Softpot tuning loop for {SoftpotName} hit threshold of (Err <= {MeasTolerance:F3}, Var <= {VarTolerance:F3}), exiting tune loop!");
                         // Break out of loop
                         break;
                     }
@@ -206,23 +238,30 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
 
                     // Update softpot
                     softpotValue = softpotValue + control;
+                    
                     // Clamp
                     if (softpotValue > softpotMax) { softpotValue = softpotMax; }
                     else if (softpotValue < softpotMin) { softpotValue = softpotMin; }
 
-                    LogCallback($"RefOsc tuning iter {i}: err {error:F3} (avg {errAvg.Value:F3}), new softpot setting {softpotValue:F0} ({(control >= 0?"+":"")}{control:F3})");
-
                     // Update softpot
-                    softpotBytes = spValToBytes((int)Math.Round(softpotValue));
+                    softpotBytes = MotorolaXCMPRadioBase.SoftpotValueToBytes((int)Math.Round(softpotValue), (int)spByteLength);
                     Radio.SoftpotUpdate(SoftpotType, softpotBytes);
+
+                    // Add to variance tracker
+                    softpotVariance.Add(softpotValue);
+
+                    LogCallback($"Tuning iter {i}: err {error:F3} (avg {errAvg.Value:F3}), var {softpotVariance.Value:F3}, new softpot setting {softpotValue:F0} ({(control >= 0 ? "+" : "")}{control:F3})");
 
                     i++;
 
                     await Task.Delay(iterDelay, ct);
                 }
 
+                // Store the final value
+                FinalSoftpotBytes = softpotBytes;
+
                 // If we're within tolerance, write the new value
-                if (Math.Abs(error) <= MeasTolerance)
+                if (Math.Abs(errAvg.Value) <= MeasTolerance)
                 {
                     Radio.SoftpotWrite(SoftpotType, softpotBytes);
                     LogCallback($"Softpot tuning for {SoftpotName} success! Total error: {error:F3}, wrote new softpot value {softpotValue:F0}");
@@ -233,61 +272,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola
                     LogCallback($"Softpot tuning for {SoftpotName} FAILED: Total error {error:F3} greater than max allowable {MeasTolerance:F0}");
                     return false;
                 }
-            }
-
-            /// <summary>
-            /// Convert an array of bytes to an integer value
-            /// </summary>
-            /// <param name="bytes">bytes to convert</param>
-            /// <returns>converted integer value</returns>
-            /// <exception cref="NotImplementedException">if byte size is not 8, 4, 2, or 1</exception>
-            private int spBytesToVal(byte[] bytes)
-            {
-                // flip byte array since softpot bytes are little-endian
-                bytes = bytes.Reverse().ToArray();
-                // Convert
-                switch (spByteLength)
-                {
-                    case 4:
-                        return BitConverter.ToInt32(bytes);
-                    case 2:
-                        return BitConverter.ToInt16(bytes);
-                    case 1:
-                        return bytes[0];
-                    default:
-                        throw new NotImplementedException($"Value byte length of {spByteLength} not supported!");
-                }
-            }
-
-            /// <summary>
-            /// Convert an integer value to an array of bytes
-            /// </summary>
-            /// <param name="val">value to convert</param>
-            /// <returns>byte array</returns>
-            /// <exception cref="NotImplementedException"></exception>
-            private byte[] spValToBytes(int val)
-            {
-                // Bytes holder
-                byte[] bytes;
-                // Convert
-                switch (spByteLength)
-                {
-                    case 4:
-                        bytes = BitConverter.GetBytes(val);
-                        break;
-                    case 2:
-                        bytes = BitConverter.GetBytes((short)val);
-                        break;
-                    case 1:
-                        bytes = new byte[] { (byte)val };
-                        break;
-                    default:
-                        throw new NotImplementedException($"Value byte length of {spByteLength} not supported!");
-                }
-                // Swap for little-endian
-                bytes = bytes.Reverse().ToArray();
-                // Return
-                return bytes;
             }
         }
     }

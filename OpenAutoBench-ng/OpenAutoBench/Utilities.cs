@@ -39,5 +39,42 @@ namespace OpenAutoBench_ng.OpenAutoBench
                 }
             }
         }
+
+        public class Variance
+        {
+            public double Value
+            {
+                get
+                {
+                    // Calculate average for all samples
+                    double mean = samples.Sum() / samples.Count;
+                    // Sum of all the squared differences
+                    double diffSum = 0;
+                    foreach(double sample in samples.ToArray())
+                    {
+                        // Calculate difference and square it, add to sum
+                        diffSum += Math.Pow((sample - mean), 2);
+                    }
+                    // Return the sum divided by the number of samples - 1
+                    return diffSum / (WindowSize - 1);
+                }
+            }
+
+            public int WindowSize { get; private set; }
+
+            private Queue<double> samples = new Queue<double>();
+
+            public Variance(int windowSize)
+            {
+                this.WindowSize = windowSize;
+            }
+
+            public void Add(double sample)
+            {
+                samples.Enqueue(sample);
+                if (samples.Count > WindowSize)
+                    samples.Dequeue();
+            }
+        }
     }
 }

@@ -52,8 +52,8 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XPR
         {
             try
             {
-                Radio.SetRXFrequency(RXFrequency, false);
-                Instrument.SetTxFrequency(RXFrequency);
+                Radio.SetRXFrequency(RXFrequency, Bandwidth.BW_25kHz, RxModulation.C4FM);
+                await Instrument.SetTxFrequency(RXFrequency);
                 Radio.Keyup();
                 await Task.Delay(5000);
                 float measErr = await Instrument.MeasureFrequencyError();

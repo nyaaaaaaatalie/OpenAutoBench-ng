@@ -51,6 +51,11 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
             _serialPort.Close();
         }
 
+        public async Task Write(string toSend)
+        {
+            await Transmit(toSend);
+        }
+
         /// <summary>
         /// Transmit and receive data
         /// </summary>

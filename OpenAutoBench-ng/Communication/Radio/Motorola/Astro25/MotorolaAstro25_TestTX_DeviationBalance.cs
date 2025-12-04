@@ -8,11 +8,5 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.Astro25
         {
             //
         }
-
-        public override async Task Setup()
-        {
-            await base.Setup();
-            TXFrequencies = MotorolaAstro25_Frequencies.TxFrequencies(Radio);
-        }
     }
 }

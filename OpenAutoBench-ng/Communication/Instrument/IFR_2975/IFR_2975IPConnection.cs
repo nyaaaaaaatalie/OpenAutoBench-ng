@@ -34,6 +34,15 @@ namespace OpenAutoBench_ng.Communication.Instrument.IFR_2975
             throw new NotImplementedException();
         }
 
+        public async Task Write(string toSend)
+        {
+            Console.WriteLine($"Writing: {toSend}");
+            await _connection.FlushBuffer();
+            toSend += "\n";
+            byte[] dataOut = System.Text.Encoding.ASCII.GetBytes(toSend);
+            await _connection.TransmitByte(dataOut);
+        }
+
         public async Task<string> Send(string toSend)
         {
             Console.WriteLine($"Sending: {toSend}");

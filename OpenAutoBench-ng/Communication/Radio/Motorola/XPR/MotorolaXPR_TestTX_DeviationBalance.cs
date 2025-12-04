@@ -8,11 +8,5 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XPR
         {
             //
         }
-
-        public override async Task Setup()
-        {
-            await base.Setup();
-            TXFrequencies = MotorolaXPR_Frequencies.TxDeviationFrequencies(Radio);
-        }
     }
 }

@@ -6,6 +6,8 @@
 
         public void Disconnect();
 
+        public Task Write(string toSend);
+
         public Task<string> Send(string toSend);
 
         public Task Transmit(string toSend);

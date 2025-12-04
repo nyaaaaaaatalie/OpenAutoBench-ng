@@ -10,12 +10,5 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
         {
             //
         }
-
-        public override async Task Setup()
-        {
-            await base.Setup();
-            int[] TXFrequencies = MotorolaAPX_RefData.TxFrequencies(radio);
-            TXFrequency = TXFrequencies[TXFrequencies.Length - 1];
-        }
     }
 }

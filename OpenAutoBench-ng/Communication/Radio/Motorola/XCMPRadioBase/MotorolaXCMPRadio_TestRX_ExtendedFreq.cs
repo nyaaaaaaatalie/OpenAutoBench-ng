@@ -40,12 +40,12 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 for (int i=StartFrequency; i<=EndFrequency; i+=StepFrequency)
                 {
                     Radio.SetReceiveConfig(XCMPRadioReceiveOption.CSQ);
-                    Radio.SetRXFrequency(i, false);
+                    Radio.SetRXFrequency(i, Bandwidth.BW_25kHz, RxModulation.C4FM);
                     await Instrument.SetTxFrequency(i);
                     await Task.Delay(5000, Ct);
                     await Instrument.GenerateSignal(-47); // was -50
                     await Task.Delay(5000, Ct);
-                    byte rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI)[0];
+                    byte rssi = Radio.GetStatus(StatusOperation.RSSI)[0];
 
                     await Instrument.StopGenerating();
                     Report.AddResult(OpenAutoBench.ResultType.RSSI, rssi, 150, 150, 255, i);

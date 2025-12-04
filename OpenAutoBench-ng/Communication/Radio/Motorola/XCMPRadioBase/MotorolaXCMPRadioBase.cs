@@ -5,6 +5,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 {
@@ -24,95 +25,206 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         protected IXCMPRadioConnection _connection;
 
-        public enum VersionOperation : byte
+        public class XcmpMessage
         {
-            HostSoftware = 0x00,
-            DSPSoftware = 0x10,
-            UCMSoftware = 0x20,
-            MACESoftware = 0x23,
-            BootloaderVersion = 0x30,
-            TuningVersion = 0x40,
-            CPVersion = 0x42,
-            RFBand = 0x63,
-            RFPowerLevel = 0x65
+            /// <summary>
+            /// XCMP message type
+            /// </summary>
+            public MsgType MsgType { get; private set; }
+            /// <summary>
+            /// Opcode for the request
+            /// </summary>
+            public Opcode Opcode { get; private set; }
+            /// <summary>
+            /// Result used for response messages
+            /// </summary>
+            public Result Result { get; set; }
+            /// <summary>
+            /// The byte data of the message
+            /// </summary>
+            public byte[] Data { get; set; }
+            /// <summary>
+            /// The length of all data excluding the starting two length bytes
+            /// </summary>
+            public int Length
+            {
+                get
+                {
+                    // Responses have an extra byte for status
+                    if (MsgType == MsgType.RESPONSE)
+                        return Data.Length + 3;
+                    else
+                        return Data.Length + 2;
+                }
+            }
+            /// <summary>
+            /// The length of all bytes in the message, including length bytes
+            /// </summary>
+            public int ByteLength
+            {
+                get
+                {
+                    return Length + 2;
+                }
+            }
+            /// <summary>
+            /// Get the XCMP message as bytes to send over a connection, including the starting length bytes
+            /// </summary>
+            public byte[] Bytes { 
+                get
+                {
+                    // Create the new 
+                    byte[] msg = new byte[ByteLength];
+                    // Add length bytes
+                    msg[0] = (byte)((Length >> 8) & 0xFF);
+                    msg[1] = (byte)(Length & 0xFF);
+                    // Generate Type/Opcode Header Bytes
+                    byte[] header = GetTypeOpcodeHeader(MsgType, Opcode);
+                    msg[2] = header[0];
+                    msg[3] = header[1];
+                    // Add optional result code and data
+                    if (MsgType == MsgType.RESPONSE)
+                    {
+                        msg[4] = (byte)Result;
+                        Array.Copy(Data, 0, msg, 5, Data.Length);
+                    }
+                    else
+                    {
+                        Array.Copy(Data, 0, msg, 4, Data.Length);
+                    }
+                    // return the array
+                    return msg;
+                } 
+            }
+
+            /// <summary>
+            /// Create a new XCMP message of the specified type
+            /// </summary>
+            /// <param name="type"></param>
+            public XcmpMessage(MsgType type, Opcode opcode)
+            {
+                MsgType = type;
+                Opcode = opcode;
+                Data = new byte[] { };
+            }
+
+            /// <summary>
+            /// Parse an XCMP message from a byte aray including the starting length bytes
+            /// </summary>
+            /// <param name="data"></param>
+            public XcmpMessage(byte[] data)
+            {
+                // Get length first
+                int len = (data[0] << 8) + (data[1] & 0xFF);
+                Console.WriteLine($"XCMP: Decoding message of length {len}");
+                // Get type & opcode next
+                UInt16 header = (UInt16)((data[2] << 8) + (data[3] & 0xFF));
+                MsgType = GetMsgType(header);
+                Opcode = GetOpcode(header);
+                
+                if (MsgType == MsgType.RESPONSE)
+                {
+                    Result = (Result)data[4];
+                    Data = data.Skip(5).Take(len - 3).ToArray();
+                    Console.WriteLine($"XCMP: Got MsgType {(byte)MsgType:X} ({Enum.GetName(MsgType)}), Opcode {(byte)Opcode:X} ({Enum.GetName(Opcode)}), Result {(byte)Result:X} ({Enum.GetName(Result)}), Data: [{Convert.ToHexString(Data)}]");
+                }
+                else
+                {
+                    Data = data.Skip(4).Take(len - 2).ToArray();
+                    Console.WriteLine($"XCMP: Got MsgType {(byte)MsgType:X} ({Enum.GetName(MsgType)}), Opcode {(byte)Opcode:X} ({Enum.GetName(Opcode)}), Data: [{Convert.ToHexString(Data)}]");
+                }
+                // Validate
+                if (Length != len)
+                {
+                    throw new Exception($"Decoded message lengths don't match (got {Length} but expected {len})");
+                }
+            }
         }
 
-        public enum StatusOperation : byte
+        public class SoftpotMessage : XcmpMessage
         {
-            RSSI = 0x02,
-            BatteryLevel = 0x03,
-            LowBattery = 0x04,
-            ModelNumber = 0x07,
-            SerialNumber = 0x08,
-            ESN = 0x09,
-            RadioID = 0x0E,
-            RFPATemp = 0x1D,
-            
+            /// <summary>
+            /// The softpot operation
+            /// </summary>
+            public SoftpotOperation Operation { 
+                get
+                {
+                    return (SoftpotOperation)Data[0];
+                }
+                set
+                {
+                    Data[0] = (byte)value;
+                }
+            }
+            /// <summary>
+            /// The softpot type
+            /// </summary>
+            public SoftpotType Type
+            {
+                get
+                {
+                    return (SoftpotType)Data[1];
+                }
+                set
+                {
+                    Data[1] = (byte)value;
+                }
+            }
+            /// <summary>
+            /// The softpot value or values as a variable-length byte array
+            /// </summary>
+            public byte[] Value {  
+                get
+                {
+                    // Return everything after the softpot oepration/type
+                    return Data.Skip(2).ToArray();
+                }
+                set
+                {
+                    // Save the old values for recreating the array
+                    SoftpotOperation oper = Operation;
+                    SoftpotType type = Type;
+                    // Create a new data array
+                    Data = new byte[value.Length + 2];
+                    Operation = oper;
+                    Type = type;
+                    // Copy the value into the data array
+                    Array.Copy(value, 0, Data, 2, value.Length);
+                }
+            }
+            /// <summary>
+            /// Create a new Softpot-specific XCMP message
+            /// </summary>
+            /// <param name="msgType"></param>
+            /// <param name="operation"></param>
+            /// <param name="type"></param>
+            public SoftpotMessage(MsgType msgType, SoftpotOperation operation, SoftpotType type) : base(msgType, Opcode.SOFTPOT)
+            {
+                // Start the data array with size 2
+                Data = new byte[2];
+                // Parse our values
+                Operation = operation;
+                Type = type;
+            }
+            /// <summary>
+            /// Parse a softpot-specific XCMP message from a byte array
+            /// </summary>
+            /// <param name="data"></param>
+            public SoftpotMessage(byte[] data) : base(data)
+            {
+            }
         }
 
-        public enum SoftpotOperation : byte
+        /// <summary>
+        /// Softpot Parameters Struct
+        /// </summary>
+        public struct SoftpotParams
         {
-            Read = 0x00,
-            Write = 0x01,
-            Update = 0x02,
-            ReadAll = 0x03,
-            WriteAll = 0x04,
-            Autotune = 0x05,
-            ReadMin = 0x06,
-            ReadMax = 0x07,
-            ReadFrequency = 0x08,
-        }
-
-        public enum SoftpotType : byte
-        {
-            RefOsc = 0x00,
-            TxPower = 0x01,
-            ModBalance = 0x02,
-            FrontendFilt1 = 0x03,
-            CurrentLimit = 0x04,
-            ModLimit = 0x05,
-            TempComp = 0x06,
-            TxPowerChar = 0x07,
-            BattCal = 0x08,
-            RFPABias1 = 0x09,
-            RFPABias2 = 0x0A,
-            RFPABias3 = 0x0B,
-            RFPABias4 = 0x0C,
-            FrontendFilt2 = 0x0D,
-            FrontendFilt3 = 0x0E,
-            RFPAGainCal = 0x0F,
-            RFPAGainCalPoint = 0x10,
-            TxPowerCharPoint = 0x11,
-            IntMicGain = 0x12,
-            ExtMicGain = 0x13,
-            TxIQBal = 0x14,
-            MaxTunedPwr = 0x15,
-            HPDRSSIComp = 0x16,
-            HPDRFPABias1 = 0x17,
-            HPDRFPABias2 = 0x18,
-            HPDRFPABias3 = 0x19,
-            HPDRFPABias4 = 0x1A,
-            HPDCurentLimit = 0x1B,
-            HPDTxPower = 0x1C,
-            HPDPhaseComp = 0x1D,
-            HPDAmpComp = 0x1E,
-            RxAttComp = 0x1F,
-            FrontEndGain = 0x20,
-            StepAtten = 0x21,
-            Volume = 0x22,
-            PwrCtrlAttOff = 0x23,
-            DACn = 0x24,
-            IntTempADC = 0x25,
-            BattVoltADC = 0x26,
-            PAVoltLimit = 0x27,
-            PAMaxIset = 0x28,
-            PwrCtrlBattParam = 0x29,
-            BattVoltCutSlope = 0x2A,
-            LowPortMod = 0x2B,
-            PASatRef = 0x2C,
-            SpurSetting = 0x2D,
-            IntRDAC = 0x2E,
-            RDACPwrChar = 0x2F,
+            public int Min { get; set; }
+            public int Max { get; set; }
+            public int[] Frequencies { get; set; }
+            public int ByteLength { get; set; }
+            public int[] Values { get; set; }
         }
 
         public MotorolaXCMPRadioBase(IXCMPRadioConnection conn)
@@ -125,22 +237,193 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             _connection = conn;
 
         }
+
+        /// <summary>
+        /// Convert a 4-byte motorola frequency to a frequency in Hz
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        public static UInt32 BytesToFrequency(byte[] data)
+        {
+            // Validate length
+            if (data.Length != 4) { throw new ArgumentException("Frequency data must be 4 bytes!"); }
+            // Convert bytes to int32 and multiply by 5 Hz (after reversing the endianess)
+            return (UInt32)(BitConverter.ToInt32(data.Reverse().ToArray()) * 5);
+        }
+
+        /// <summary>
+        /// Convert a frequency in Hz to a 4-byte motorola-specific array
+        /// </summary>
+        /// <param name="frequency"></param>
+        /// <returns></returns>
+        public static byte[] FrequencyToBytes(int frequency)
+        {
+            // We reverse the byte order to get the endianness correct
+            return BitConverter.GetBytes((UInt32)frequency / 5).Reverse().ToArray();
+        }
+
+        /// <summary>
+        /// Convert an array of bytes to an integer value
+        /// </summary>
+        /// <param name="bytes">bytes to convert</param>
+        /// <returns>converted integer value</returns>
+        /// <exception cref="NotImplementedException">if byte size is not 8, 4, 2, or 1</exception>
+        public static int SoftpotBytesToValue(byte[] bytes)
+        {
+            // flip byte array since softpot bytes are little-endian
+            bytes = bytes.Reverse().ToArray();
+            // Convert
+            switch (bytes.Length)
+            {
+                case 4:
+                    return BitConverter.ToInt32(bytes);
+                case 2:
+                    return BitConverter.ToInt16(bytes);
+                case 1:
+                    return bytes[0];
+                default:
+                    throw new NotImplementedException($"Value byte length of {bytes.Length} not supported!");
+            }
+        }
+
+        /// <summary>
+        /// Convert an integer value to an array of bytes
+        /// </summary>
+        /// <param name="val">value to convert</param>
+        /// <returns>byte array</returns>
+        /// <exception cref="NotImplementedException"></exception>
+        public static byte[] SoftpotValueToBytes(int val, int byteLen)
+        {
+            // Bytes holder
+            byte[] bytes;
+            // Convert
+            switch (byteLen)
+            {
+                case 4:
+                    bytes = BitConverter.GetBytes(val);
+                    break;
+                case 2:
+                    bytes = BitConverter.GetBytes((short)val);
+                    break;
+                case 1:
+                    bytes = new byte[] { (byte)val };
+                    break;
+                default:
+                    throw new NotImplementedException($"Value byte length of {byteLen} not supported!");
+            }
+            // Swap for little-endian
+            bytes = bytes.Reverse().ToArray();
+            // Return
+            return bytes;
+        }
+
+        /// <summary>
+        /// Get the XCMP opcode from the 2-byte type/opcode
+        /// </summary>
+        /// <param name="typeOpcode"></param>
+        /// <returns></returns>
+        public static Opcode GetOpcode(UInt16 header)
+        {
+            // Opcode is the lower 12 bits of the header
+            return (Opcode)(header & 0xFFF);
+        }
+        /// <summary>
+        /// Get the XCMP message type from the 2-byte type/opcode
+        /// </summary>
+        /// <param name="typeOpcode"></param>
+        /// <returns></returns>
+        public static MsgType GetMsgType(UInt16 header)
+        {
+            // MsgType is the top 4 bits of the header
+            return (MsgType)((header & 0xF000) >> 12);
+        }
+        /// <summary>
+        /// Get the XCMP message header (type + opcode) as a UInt16
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="opcode"></param>
+        /// <returns></returns>
+        public static byte[] GetTypeOpcodeHeader(MsgType type, Opcode opcode)
+        {
+            return new byte[2]
+            {
+                (byte)( ((byte)type << 4) + ((byte)opcode >> 8) ),
+                (byte)( (UInt16)opcode & 0xFF)
+            };
+        }
+
+        /// <summary>
+        /// Connect to the attached radio
+        /// </summary>
+        /// <param name="underTest"></param>
         public void Connect(bool underTest = false)
         {
             _connection.Connect();
             if (!underTest)
             {
-                SerialNumber = System.Text.Encoding.UTF8.GetString(GetStatus(StatusOperation.SerialNumber)).TrimEnd('\0');
-                ModelNumber = System.Text.Encoding.UTF8.GetString(GetStatus(StatusOperation.ModelNumber)).TrimEnd('\0');
+                SerialNumber = GetSerial();
+                ModelNumber = GetModel();
+                FirmwareVersion = $"HOST {GetVersion(VersionOperation.HostSoftware)}, DSP {GetVersion(VersionOperation.DSPSoftware)}";
+                Console.WriteLine($"XCMP: connected to radio model {ModelNumber} (S/N {SerialNumber}, {FirmwareVersion})");
             }
         }
 
+        /// <summary>
+        /// Disconnect from the radio
+        /// </summary>
         public void Disconnect()
         {
             _connection.Disconnect();
+
+            Console.WriteLine($"XCMP: Disconnected from radio, seeya!");
         }
 
-        public byte[] Send(byte[] data)
+        /// <summary>
+        /// Send an XCMP message and retrieve the response
+        /// </summary>
+        /// <param name="message">message to send</param>
+        /// <param name="timeout">timeout in seconds to wait for a resposne</param>
+        /// <returns></returns>
+        public XcmpMessage Send(XcmpMessage message, int timeout = 1)
+        {
+            // Send the message
+            //Console.WriteLine("XCMP: >>SNT>> " + Convert.ToHexString(message.Bytes));
+            _connection.Send(message.Bytes);
+            
+            // Get the response
+            var start = DateTime.Now;
+            while (DateTime.Now < start + TimeSpan.FromSeconds(timeout))
+            {
+                // Get the response
+                byte[] rx = _connection.Receive();
+                XcmpMessage response = new XcmpMessage(rx);
+                //Console.WriteLine("XCMP: <<RCV<< " + Convert.ToHexString(response.Bytes));
+
+                // Validate it's a response
+                if (response.MsgType != MsgType.RESPONSE)
+                    throw new Exception($"Got non-response message! ({response.MsgType})");
+                // Validate it was successful
+                if (response.Result != Result.SUCCESS)
+                    throw new Exception($"Response indicates {Enum.GetName(response.Result)}!");
+                // Validate it matches
+                if (response.Opcode != message.Opcode)
+                    throw new Exception($"Received different opcode from what was sent! (Sent {message.Opcode} but got {response.Opcode})");
+                // Return if everything is good
+                
+                return response;
+            }
+
+            // Throw a timeout if we timed out
+            throw new TimeoutException("Radio did not reply in a timely manner.");
+        }
+
+        /// <summary>
+        /// Byte-Level XCMP send/receive
+        /// </summary>
+        /// <param name="data"></param>
+        /// <returns></returns>
+        /// <exception cref="TimeoutException"></exception>
+        public byte[] SendBytes(byte[] data)
         {
             int opcodeOut = 0;
             opcodeOut |= (data[0] << 8);
@@ -157,7 +440,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
             Array.Copy(data, 0, toSend, 2, dataLen);
 
-            Console.WriteLine("Sending  " + Convert.ToHexString(toSend));
+            //Console.WriteLine("XCMP: >>SNT>> " + Convert.ToHexString(toSend));
 
             _connection.Send(toSend);
 
@@ -173,7 +456,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                 len |= (fromRadio[0] << 8) & 0xFF;
                 len |= fromRadio[1];
 
-                Console.WriteLine("Received " + Convert.ToHexString(fromRadio.Take(len + 2).ToArray()));
+                //Console.WriteLine("XCMP: <<RCV<< " + Convert.ToHexString(fromRadio.Take(len + 2).ToArray()));
 
                 byte[] retval = new byte[len];
 
@@ -191,152 +474,172 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             throw new TimeoutException("Radio did not reply in a timely manner.");
         }
 
-        public byte[] GetVersion(VersionOperation oper)
+        /// <summary>
+        /// Get the connected radio's serial number
+        /// </summary>
+        /// <returns></returns>
+        public string GetSerial()
         {
-            byte[] cmd = new byte[3];
+            Console.WriteLine($"XCMP: getting radio serial number");
 
-            // XCMP opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x0f;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.SERIAL_NUMBER);
 
-            // the power index
-            cmd[2] = (byte)oper;
+            return Encoding.UTF8.GetString(Send(msg).Data).TrimEnd('\0');
+        }
 
-            return Send(cmd);
+        /// <summary>
+        /// Get the connected radio's model number
+        /// </summary>
+        /// <returns></returns>
+        public string GetModel()
+        {
+            Console.WriteLine($"XCMP: getting radio model number");
+
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.MODEL_NUMBER);
+
+            return Encoding.UTF8.GetString(Send(msg).Data).TrimEnd('\0');
+        }
+
+        /// <summary>
+        /// Get Radio SW Version
+        /// </summary>
+        /// <param name="oper"></param>
+        /// <returns></returns>
+        public string GetVersion(VersionOperation oper)
+        {
+            Console.WriteLine($"XCMP: getting radio version for {Enum.GetName<VersionOperation>(oper)}");
+
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.VERSION_INFO);
+            msg.Data = new byte[] { (byte)oper };
+
+            XcmpMessage resp = Send(msg);
+
+            return Encoding.UTF8.GetString(resp.Data).TrimEnd('\0');
         }
 
         public byte[] GetStatus(StatusOperation oper)
         {
-            byte[] cmd = new byte[3];
+            Console.WriteLine($"XCMP: getting radio status {Enum.GetName<StatusOperation>(oper)}");
 
-            // XCMP opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x0e;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RADIO_STATUS);
+            msg.Data = new byte[] { (byte)oper };
 
-            // the status byte
-            cmd[2] = (byte)oper;
+            XcmpMessage resp = Send(msg);
 
-            byte[] result = Send(cmd);
+            // Verify we got the same status back
+            if ((StatusOperation)resp.Data[0] != oper)
+                throw new Exception($"Did not receive expected status operation (got {resp.Data[0]:X} ({Enum.GetName((StatusOperation)resp.Data[0])}) but expected {(byte)oper:X} ({Enum.GetName(oper)}))");
 
-            byte[] returnVal = new byte[result.Length - 4];
-
-            //Console.WriteLine("Length is " + returnVal.Length);
-
-            Array.Copy(result, 4, returnVal, 0, result.Length - 4);
-
-            return returnVal;
+            // Skip the first byte (the operation)
+            return resp.Data.Skip(1).ToArray();
         }
 
-        public void SetPowerLevel(int powerIndex)
+        public MotorolaBand[] GetBands()
         {
-            byte[] cmd = new byte[3];
-            
-            // XCMP opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x06;
-            
-            // the power index
-            cmd[2] = (byte)powerIndex;
+            Console.WriteLine($"XCMP: getting radio bands");
 
-            Send(cmd);
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.VERSION_INFO);
+            msg.Data = new byte[] { (byte)VersionOperation.RFBand };
+
+            XcmpMessage resp = Send(msg);
+
+            List<MotorolaBand> bands = new List<MotorolaBand>();
+            foreach(byte b in resp.Data) { bands.Add((MotorolaBand)b); }
+            return bands.ToArray();
         }
 
         public void EnterServiceMode()
         {
-            byte[] cmd = new byte[2];
+            Console.WriteLine($"XCMP: entering service mode");
 
-            // XCMP opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x0c;
-
-            Send(cmd);
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.ENTER_TEST_MODE);
+            
+            Send(msg);
         }
 
         public void ResetRadio()
         {
-            byte[] cmd = new byte[2];
+            Console.WriteLine($"XCMP: resetting radio");
 
-            // XCMP opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x0d;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RADIO_RESET);
 
-            Send(cmd);
+            Send(msg);
         }
 
-        public void SetTXFrequency(int frequency, bool modulated)
+        public void SetTXFrequency(int frequency, Bandwidth bandwidth, TxDeviation deviation)
         {
-            // divide by 5 to fit in XCMP opcode
-            frequency = frequency / 5;
-            byte[] cmd = new byte[8];
+            Console.WriteLine($"XCMP: setting TX frequency to {frequency} (BW: {Enum.GetName(bandwidth)}, DEV: {Enum.GetName(deviation)})");
 
-            // XCMP opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x0b;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.TX_FREQUENCY);
+            msg.Data = new byte[6];
 
-            // frequency
-            cmd[2] = (byte) ((frequency >> 24) & 0xFF);
-            cmd[3] = (byte) ((frequency >> 16) & 0xFF);
-            cmd[4] = (byte) ((frequency >> 8) & 0xFF);
-            cmd[5] = (byte) (frequency & 0xFF);
+            // First 4 bytes are frequency
+            Array.Copy(FrequencyToBytes(frequency), 0, msg.Data, 0, 4);
 
-            // bw
-            cmd[6] = 0x64;
+            // Fifth byte is bandwidth
+            msg.Data[4] = (byte)bandwidth;
 
-            // modulated yes/no
-            cmd[7] = Convert.ToByte(modulated);
+            // Sixth byte is modulation
+            msg.Data[5] = (byte)deviation;
 
-            Send(cmd);
+            Send(msg);
         }
 
-        public void SetRXFrequency(int frequency, bool modulated)
+        public void SetRXFrequency(int frequency, Bandwidth bandwidth, RxModulation modulation)
         {
-            // divide by 5 to fit in XCMP opcode
-            frequency = frequency / 5;
-            byte[] cmd = new byte[8];
+            Console.WriteLine($"XCMP: setting RX frequency to {frequency} (BW: {Enum.GetName(bandwidth)}, MOD: {Enum.GetName(modulation)})");
 
-            // XCMP opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x0a;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RX_FREQUENCY);
+            msg.Data = new byte[6];
 
-            // frequency
-            cmd[2] = (byte)((frequency >> 24) & 0xFF);
-            cmd[3] = (byte)((frequency >> 16) & 0xFF);
-            cmd[4] = (byte)((frequency >> 8) & 0xFF);
-            cmd[5] = (byte)(frequency & 0xFF);
+            // First 4 bytes are frequency
+            Array.Copy(FrequencyToBytes(frequency), 0, msg.Data, 0, 4);
 
-            // bw
-            cmd[6] = 0x64;
+            // Fifth byte is bandwidth
+            msg.Data[4] = (byte)bandwidth;
 
-            // modulated yes/no
-            cmd[7] = Convert.ToByte(modulated);
+            // Sixth byte is modulation
+            msg.Data[5] = (byte)modulation;
 
-            Send(cmd);
+            Send(msg);
         }
 
-        public void Keyup()
+        public void Keyup(TxMicrophone microphone = TxMicrophone.ExternalMuted)
         {
-            byte[] cmd = new byte[3];
+            Console.WriteLine($"XCMP: keying radio");
 
-            // transmit opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x04;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.TRANSMIT);
+            msg.Data = new byte[1] { (byte)microphone };
 
-            cmd[2] = 0x03;
-
-            Send(cmd);
+            Send(msg);
         }
 
         public void Dekey()
         {
-            byte[] cmd = new byte[3];
+            Console.WriteLine($"XCMP: dekeying radio");
 
-            // receive opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x05;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RECEIVE);
+            msg.Data = new byte[1] { (byte)RxSpeaker.InternalMuted };
 
-            cmd[2] = 0x11;
+            Send(msg);
+        }
 
-            Send(cmd);
+        /// <summary>
+        /// Send a softpot message and retrieve a softpot response
+        /// </summary>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        public SoftpotMessage SendSoftpot(SoftpotMessage message)
+        {
+            // Send the softpot message and receive and standard XCMP message
+            XcmpMessage resp = Send(message);
+            // Convert the response to a softpot message by parsing the bytes
+            SoftpotMessage sp_resp = new SoftpotMessage(resp.Bytes);
+            // Verify that we got the correct type back
+            if (sp_resp.Type != message.Type)
+                throw new Exception($"Received different softpot type from what was sent! (Sent {message.Type} but got {sp_resp.Type})");
+            // Return
+            return sp_resp;
         }
 
         /// <summary>
@@ -346,72 +649,26 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <returns>The bytes representing the softpot value (variable length)</returns>
         public byte[] SoftpotGetValue(SoftpotType type)
         {
-            byte[] cmd = new byte[4];
+            Console.WriteLine($"XCMP: Getting softpot value for {Enum.GetName(type)}");
 
-            // receive opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x01;
-            // read operation
-            cmd[2] = (byte)SoftpotOperation.Read;
-            // softpot type
-            cmd[3] = (byte)type;
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ, type);
 
-            // Send and get response
-            byte[] resp = Send(cmd);
-
-            // Make sure we were successful
-            if (resp[2] != 0x00)
-            {
-                throw new InvalidDataException("Softpot read command did not return SUCCESS!");
-            }
-
-            // Validate type is the same
-            if (resp[4] != (byte)type)
-            {
-                throw new InvalidDataException($"Did not receive softpot type we asked for! {resp[4]} != {type}");
-            }
-
-            // Get value (remaining bytes in array)
-            byte[] value = resp.Skip(5).ToArray();
-            return value;
+            return SendSoftpot(msg).Value;
         }
 
         /// <summary>
-        /// Get the maximum value for a softpot
+        /// Get the minimum value for a softpot
         /// </summary>
         /// <param name="type"></param>
         /// <returns></returns>
         /// <exception cref="InvalidDataException"></exception>
         public byte[] SoftpotGetMinimum(SoftpotType type)
         {
-            byte[] cmd = new byte[4];
+            Console.WriteLine($"XCMP: getting softpot minimum for {Enum.GetName(type)}");
 
-            // softpot opcode 0x0001
-            cmd[0] = 0x00;
-            cmd[1] = 0x01;
-            // operation
-            cmd[2] = (byte)SoftpotOperation.ReadMin;
-            // softpot type
-            cmd[3] = (byte)type;
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ_MIN, type);
 
-            // Send
-            byte[] resp = Send(cmd);
-
-            // Make sure we were successful
-            if (resp[2] != 0x00)
-            {
-                throw new InvalidDataException("Softpot read command did not return SUCCESS!");
-            }
-
-            // Validate type is the same
-            if (resp[4] != (byte)type)
-            {
-                throw new InvalidDataException($"Did not get min softpot type we asked for! {resp[4]} != {type}");
-            }
-
-            // Get value (remaining bytes in array)
-            byte[] value = resp.Skip(5).ToArray();
-            return value;
+            return SendSoftpot(msg).Value;
         }
 
         /// <summary>
@@ -422,34 +679,11 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <exception cref="InvalidDataException"></exception>
         public byte[] SoftpotGetMaximum(SoftpotType type)
         {
-            byte[] cmd = new byte[4];
+            Console.WriteLine($"XCMP: getting softpot maximum for {Enum.GetName(type)}");
 
-            // Softpot opcode 0x0001
-            cmd[0] = 0x00;
-            cmd[1] = 0x01;
-            // Operation
-            cmd[2] = (byte)SoftpotOperation.ReadMax;
-            // Softpot type
-            cmd[3] = (byte)type;
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ_MAX, type);
 
-            // Send
-            byte[] resp = Send(cmd);
-
-            // Make sure we were successful
-            if (resp[2] != 0x00)
-            {
-                throw new InvalidDataException("Softpot get max command did not return SUCCESS!");
-            }
-
-            // Validate type is the same
-            if (resp[4] != (byte)type)
-            {
-                throw new InvalidDataException($"Did not receive softpot type we asked for! {resp[4]} != {type}");
-            }
-
-            // Get value (remaining bytes in array)
-            byte[] value = resp.Skip(5).ToArray();
-            return value;
+            return SendSoftpot(msg).Value;
         }
 
         /// <summary>
@@ -460,26 +694,12 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <exception cref="InvalidDataException"></exception>
         public void SoftpotWrite(SoftpotType type, byte[] val)
         {
-            byte[] cmd = new byte[4 + val.Length];
+            Console.WriteLine($"XCMP: writing softpot {Enum.GetName(type)} -> {Convert.ToHexString(val)}");
 
-            // Softpot opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x01;
-            // operation
-            cmd[2] = (byte)SoftpotOperation.Write;
-            // Type
-            cmd[3] = (byte)type;
-            // Value
-            Buffer.BlockCopy(val, 0, cmd, 4, val.Length);
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.WRITE, type);
+            msg.Value = val;
 
-            // Send
-            byte[] resp = Send(cmd);
-
-            // Make sure we were successful
-            if (resp[2] != 0x00)
-            {
-                throw new InvalidDataException($"Softpot write command did not return SUCCESS! (Got {resp[2]})");
-            }
+            SendSoftpot(msg);
         }
 
         /// <summary>
@@ -489,207 +709,232 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <param name="val"></param>
         public void SoftpotUpdate(SoftpotType type, byte[] val)
         {
-            byte[] cmd = new byte[4 + val.Length];
+            Console.WriteLine($"XCMP: updating softpot {Enum.GetName(type)} -> {Convert.ToHexString(val)}");
 
-            // receive opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x01;
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.UPDATE, type);
+            msg.Value = val;
 
-            cmd[2] = (byte)SoftpotOperation.Update;
+            SendSoftpot(msg);
+        }
 
-            cmd[3] = (byte)type;
+        /// <summary>
+        /// Return all values for a softpot type as a list of byte arrays
+        /// </summary>
+        /// <param name="type"></param>
+        /// <param name="byteLen"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public List<byte[]> SoftpotReadAll(SoftpotType type, int byteLen)
+        {
+            Console.Write($"XCMP: reading all softpot values for softpot {Enum.GetName(type)} ({byteLen} bytes each");
 
-            Buffer.BlockCopy(val, 0, cmd, 4, val.Length);
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ_ALL, type);
 
-            byte[] resp = Send(cmd);
+            SoftpotMessage resp = SendSoftpot(msg);
 
-            // Make sure we were successful
-            if (resp[2] != 0x00)
+            // Validate
+            if (resp.Value.Length % byteLen != 0)
+                throw new Exception($"Softpot value array not an even multiple of byte length!");
+
+            // Determine number of values in response
+            int n_vals = (int)(resp.Value.Length / byteLen);
+
+            // List
+            List<byte[]> values = new List<byte[]>();
+            
+            // Iterate
+            for (int i = 0; i < n_vals; i++)
             {
-                throw new InvalidDataException($"Softpot update command did not return SUCCESS! (Got {resp[2]})");
+                byte[] value = resp.Value.Skip(i * byteLen).Take(byteLen).ToArray();
+                values.Add(value);
             }
+
+            return values;
+        }
+
+        /// <summary>
+        /// Read all frequencies associated with a softpot type
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public int[] SoftpotReadAllFrequencies(SoftpotType type)
+        {
+            Console.WriteLine($"XCMP: reading all softpot frequencies for softpot {Enum.GetName(type)}");
+
+            SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ_ALL_FREQ, type);
+
+            SoftpotMessage resp = SendSoftpot(msg);
+
+            // Parse the frequencies in the response (freqs are 4 byes each)
+            int n_freqs = (resp.Length - 4) / 4;
+            int[] freqs = new int[n_freqs];
+            for (int i = 0; i < n_freqs; i++)
+            {
+                byte[] freq_bytes = resp.Value.Skip(i * 4).Take(4).ToArray();
+                freqs[i] = (int)BytesToFrequency(freq_bytes);
+                Console.WriteLine($"Parsing frequency {i + 1}/{n_freqs}: {Convert.ToHexString(freq_bytes)} -> {freqs[i]} Hz");
+            }
+
+            return freqs;
         }
 
         public virtual int[] GetTXPowerPoints()
         {
+            // Implemented by derived classes
             throw new NotImplementedException();
+        }
+
+        public virtual void SetTransmitPower(TxPowerLevel power)
+        {
+            Console.WriteLine($"XCMP: setting TX power to {Enum.GetName(power)}");
+
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.TX_POWER_LEVEL_INDEX);
+            msg.Data = new byte[1] { (byte)power };
+
+            Send(msg);
         }
 
         public void SetTransmitConfig(XCMPRadioTransmitOption option)
         {
-            byte[] cmd = new byte[3];
+            Console.WriteLine($"XCMP: setting TX config to {Enum.GetName(option)}");
 
-            // transmit config opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x02;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.TRANSMIT_CONFIG);
+            msg.Data = new byte[1] { (byte)option };
 
-            cmd[2] = (byte)option;
-
-            Send(cmd);
+            Send(msg);
         }
 
         public void SetReceiveConfig(XCMPRadioReceiveOption option)
         {
-            byte[] cmd = new byte[3];
+            Console.WriteLine($"XCMP: setting RX config to {Enum.GetName(option)}");
 
-            // receive config opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x03;
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RECEIVE_CONFIG);
+            msg.Data = new byte[1] { (byte)option };
 
-            cmd[2] = (byte)option;
-
-            Send(cmd);
-
-            cmd = new byte[3];
-
-            // receive opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x05;
-            cmd[2] = 0x01;
-
-            Send(cmd);
+            Send(msg);
         }
 
-        public virtual MotorolaBand[] GetBands()
+        /// <summary>
+        /// Get the P25 RX BER
+        /// </summary>
+        /// <param name="nFrames">number of frames to average over for measurement</param>
+        /// <returns></returns>
+        public double GetP25BER(int nIntFrames)
         {
-            throw new NotImplementedException();
-        }
+            Console.WriteLine($"XCMP: measuring P25 BER using {nIntFrames} frames of integration");
 
-        public double GetP25BER(int nbrFrames)
-        {
-            byte[] cmd = new byte[4];
-
-            // receive config opcode
-            cmd[0] = 0x00;
-            cmd[1] = 0x03;
-
-            cmd[2] = 0x21; //test Pattern - P25 1011 Standard
-            cmd[3] = 0x00; // Mod Type - C4FM
-
-            byte[] reply = Send(cmd);
-
-            System.Threading.Thread.Sleep(500);
-
-            //BER RX Test initialization opcode
-            byte[]cmd1 = new byte[4];
-            cmd1[0] = 0x00;
-            cmd1[1] = 0x16;
-
-            cmd1[2] = 0x02; //Operation
-            cmd1[3] = (byte)nbrFrames; //Number of frames to be integrated for the BER measurement
-
-            Send(cmd1);
-
-            System.Threading.Thread.Sleep(800 * nbrFrames); // Giving the radio enough time before pulling BER measurement
-
-            byte[] cmd2 = new byte[2];
-            
-            //RX BER SYNC Report opcode
-            cmd2[0] = 0x00;
-            cmd2[1] = 0x17;
-
-            byte[] result = Send(cmd2);
-
-            System.Threading.Thread.Sleep(500);
-
-            //Discarding the 1st 3 bytes
-            byte[] berReply = new byte[25];
-            Array.Copy(result, 3, berReply, 0, 25);
-
-            return CalculateP25BER(nbrFrames, berReply);
-        }
-
-
-        private static double CalculateP25BER(int nbrFrames, byte[] berReply)
-        {
-            string noOfBitError = ""; // Stores the number of bit errors as a string.
-            double errorPercentage = -1; // Default is negative 1 if calculation fails
-
-            int chunks = berReply.Length / 5; // Each chunk in the byte array is 5 bytes long.
-            int lastFrameNumber = 0; // Tracks the last valid frame number.
-            int currentIndex = 0; // Tracks the current index in the byte array.
-            int totalBitsPerFrame = 3456; // Number of bits per frame for calculation.
-
-            // Process each 5-byte chunk.
-            while (chunks != 0)
+            // Configure the RX chain
+            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RECEIVE_CONFIG);
+            msg.Data = new byte[2]
             {
-                int frameNumber = berReply[currentIndex]; // Extract the frame number from the first byte.
+                (byte)RxBerTestPattern.P25_1011,
+                (byte)RxModulation.C4FM
+            };
+            Send(msg);
 
-                if (frameNumber != 0) // Only process if the frame number is non-zero.
-                {
-                    // Handle wrap-around of frame numbers (assuming frame numbers cycle at 255).
-                    if (lastFrameNumber == 255)
-                    {
-                        lastFrameNumber = 0;
-                    }
+            Thread.Sleep(500);
 
-                    // If the frame number is smaller than the last one, skip this chunk.
-                    if (frameNumber < lastFrameNumber)
-                    {
-                        currentIndex += 5; // Move to the next chunk.
-                        chunks--; // Decrease the chunk count.
-                        continue;
-                    }
+            // Setup for the test
+            msg = new XcmpMessage(MsgType.REQUEST, Opcode.RX_BER_CONTROL);
+            msg.Data = new byte[2]
+            {
+                (byte)RxBerTestMode.CONTINUOUS,
+                (byte)nIntFrames
+            };
+            Send(msg);
 
-                    // Analyze the second byte for sync status.
-                    if (berReply[currentIndex + 1] == 1)
-                    {
-                        // "No Sync Detected"
-                    }
-                    else if (berReply[currentIndex + 1] == 0)
-                    {
-                        // "Sync Detected"
-                    }
-                    else if (berReply[currentIndex + 1] == 2)
-                    {
-                        // "Sync Indeterminate"
-                    }
+            // Wait for the requested number of frames
+            Thread.Sleep(800 * nIntFrames);
 
-                    // If the current frame number is not greater than the last one, skip this chunk.
-                    if (lastFrameNumber >= frameNumber)
-                    {
-                        currentIndex += 5; // Move to the next chunk.
-                        chunks--; // Decrease the chunk count.
-                        continue;
-                    }
+            // Request an RX BER report
+            msg = new XcmpMessage(MsgType.REQUEST, Opcode.RX_BER_SYNC_REPORT);
+            XcmpMessage resp = Send(msg);
 
-                    // Update the last processed frame number.
-                    lastFrameNumber = frameNumber;
+            //System.Threading.Thread.Sleep(500);
 
-                    // Extract the 4-byte bit error count from the chunk (starting at the 3rd byte).
-                    long bitErrorCount = Convert4ByteArraytoLong(0, berReply[currentIndex + 2], berReply[currentIndex + 3], berReply[currentIndex + 4]);
-                    noOfBitError = bitErrorCount.ToString(); // Update the bit error count string.
+            // Parse the response
+            return CalculateP25BER(resp.Data, nIntFrames);
+        }
 
-                    // Calculate the bit error percentage.
-                    double numerator = (double)(bitErrorCount * 100L); // Scale bit error count to percentage.
-                    double denominator = (double)(nbrFrames * totalBitsPerFrame); // Total bits in all frames.
-                    
-                    // Store the result
-                    errorPercentage = numerator / denominator;
-                }
+        /// <summary>
+        /// Parse an RX BER response byte array
+        /// </summary>
+        /// <param name="berBytes">the array of BER responses, must be a multiple of 5</param>
+        /// <param name="nFrames">the number of total frames integrated per measurement</param>
+        /// <returns></returns>
+        private static double CalculateP25BER(byte[] berBytes, int nFrames)
+        {
+            // Ensure length is correct
+            if (berBytes.Length % 5 != 0)
+                throw new ArgumentException($"BER byte array must be a multiple of 5 (got length {berBytes.Length})");
 
-                currentIndex += 5; // Move to the next chunk.
-                chunks--; // Decrease the chunk count.
+            // Calculate number of BER frames
+            int frames = berBytes.Length / 5;
+
+            // Number of bits in a single P25 frame
+            const int P25_FRAME_BITS = 3456;
+
+            // Running total bit errors count
+            int totalBitErrors = 0;
+            // Total number of bits to count against
+            int totalBits = 0;
+
+            // Iterate over each report
+            for (int i = 0; i < frames; i++)
+            {
+                // Get the frame bytes
+                byte[] frame = berBytes.Skip(i * 5).Take(5).ToArray();
+                // Extract frame number
+                byte frame_n = frame[0];
+                // Extract sync/nosync
+                RxBerSyncStatus status = (RxBerSyncStatus)frame[1];
+                // If no sync or lost sync, ignore
+                if (status == RxBerSyncStatus.NO_SYNC || status == RxBerSyncStatus.LOST)
+                    continue;
+                // Add bit errors to running total
+                totalBitErrors += (int)BitConverter.ToUInt32(frame.Skip(2).Take(3).ToArray());
+                // The total number of bits for this report is the number of frames integrated plus the frame bit count
+                totalBits += (P25_FRAME_BITS * nFrames);
+            }
+            // Return the percentage of bit errors
+            return (totalBitErrors / totalBits);
+        }
+
+        /// <summary>
+        /// Retrieve the softpot parameters for a softpot from the radio
+        /// </summary>
+        /// <param name="type"></param>
+        /// <returns></returns>
+        public SoftpotParams SoftpotGetParams(SoftpotType type)
+        {
+            // New struct
+            SoftpotParams p = new SoftpotParams();
+
+            // Read frequencies
+            p.Frequencies = SoftpotReadAllFrequencies(type);
+
+            // Get min/max/byte length
+            byte[] min = SoftpotGetMinimum(type);
+            p.Min = SoftpotBytesToValue(min);
+            p.Max = SoftpotBytesToValue(SoftpotGetMaximum(type));
+            p.ByteLength = min.Length;
+
+            // Get initial values
+            List<byte[]> vals = SoftpotReadAll(type, p.ByteLength);
+
+            // Validate
+            if (vals.Count != p.Frequencies.Length)
+                throw new Exception($"Did not get expected number of softpot values for frequencies (Got {vals.Count}, Expected {p.Frequencies.Length}");
+
+            // Add to list
+            p.Values = new int[vals.Count];
+            for (int i = 0; i < vals.Count; i++)
+            {
+                p.Values[i] = SoftpotBytesToValue(vals[i]);
             }
 
-            return errorPercentage;
-        }
-
-        private static long Convert4ByteArraytoLong(byte byte1, byte byte2, byte byte3, byte byte4)
-        {
-            // Convert each byte to a long (to ensure no data loss during bitwise operations).
-            long byte1AsLong = (long)((ulong)byte1); // Most significant byte (MSB)
-            long byte2AsLong = (long)((ulong)byte2);
-            long byte3AsLong = (long)((ulong)byte3);
-            long byte4AsLong = (long)((ulong)byte4); // Least significant byte (LSB)
-
-            // Shift the bytes into their proper positions in a 32-bit number.
-            long byte1Shifted = byte1AsLong << 24; // Shift MSB to the most significant position.
-            long byte2Shifted = byte2AsLong << 16; // Shift to the second-most significant position.
-            long byte3Shifted = byte3AsLong << 8;  // Shift to the third-most significant position.
-
-            // Combine all the shifted values to reconstruct the original 32-bit value.
-            return byte1Shifted + byte2Shifted + byte3Shifted + byte4AsLong;
+            // Return
+            return p;
         }
 
     }

@@ -36,18 +36,26 @@ public class MotorolaXCMPRadio_TestRX_RSSI : IBaseTest
             for (int i = 0; i < TXFrequencies.Length; i++)
             {
                 int currFreq = TXFrequencies[i];
+
+                // Skip any 7/800 TX-Only Freqs
+                if (currFreq is > 785000000 and < 850000000)
+                {
+                    Console.WriteLine($"Skipping RSSI test for frequency {currFreq / 1e6:0.000000} MHz, TX-only 7/800 MHz band");
+                    continue;
+                }
+
                 Radio.SetReceiveConfig(XCMPRadioReceiveOption.CSQ);
-                Radio.SetRXFrequency(currFreq, false);
+                Radio.SetRXFrequency(currFreq, Bandwidth.BW_25kHz, RxModulation.C4FM);
                 await Instrument.SetTxFrequency(currFreq);
 
-                await Task.Delay(5000, Ct);
+                await Task.Delay(500, Ct);
                 await Instrument.GenerateSignal(-47); //For future version, this should be a customizable value
-                await Task.Delay(5000, Ct);
-                byte rssi = Radio.GetStatus(MotorolaXCMPRadioBase.StatusOperation.RSSI)[0];
+                await Task.Delay(1500, Ct);
+                byte rssi = Radio.GetStatus(StatusOperation.RSSI)[0];
 
                 await Instrument.StopGenerating();
                 Report.AddResult(OpenAutoBench.ResultType.RSSI, (float)rssi, 150, 150, 255, currFreq);
-                LogCallback(String.Format("Measured RSSI at {0}MHz: {1}", (currFreq / 1000000D), rssi));
+                LogCallback(String.Format("Measured RSSI at {0:0.000000} MHz: {1}", (currFreq / 1000000D), rssi));
             }
         }
         catch (OperationCanceledException)
