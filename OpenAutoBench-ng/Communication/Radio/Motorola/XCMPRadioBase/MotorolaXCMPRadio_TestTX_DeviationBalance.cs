@@ -10,7 +10,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         protected MotorolaXCMPRadioBase Radio;
 
         // Test Parameters
-        MotorolaXCMPRadioBase.SoftpotParams ModBalParams;
+        protected MotorolaXCMPRadioBase.SoftpotParams ModBalParams;
 
         protected int[] CharPoints;
 
@@ -26,11 +26,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
         public override async Task Setup()
         {
-            LogCallback(String.Format("Setting up for {0}", Name));
-
-            // Get softpot parameters
-            ModBalParams = Radio.SoftpotGetParams(SoftpotType.ModBalance);
-
             // Configure Instrument
             await Instrument.SetDisplay(InstrumentScreen.Monitor);
             await Task.Delay(1000, Ct);
@@ -46,7 +41,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_LOW);
             Radio.SetTransmitPower(TxPowerLevel.Low);
             Radio.Keyup();
-            Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(softpotValue, 4));
+            Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(softpotValue, ModBalParams.ByteLength));
             await Task.Delay(6000, Ct);
             float measDevLow = await Instrument.MeasureFMDeviation();
             measDevLow = (float)Math.Round(measDevLow);
@@ -57,7 +52,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             // high tone
             Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_HIGH);
             Radio.Keyup();
-            Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(softpotValue, 4));
+            Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(softpotValue, ModBalParams.ByteLength));
             await Task.Delay(6000, Ct);
             float measDevHigh = await Instrument.MeasureFMDeviation();
             measDevHigh = (float)Math.Round(measDevHigh);
@@ -131,7 +126,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     Radio.SetTransmitConfig(XCMPRadioTransmitOption.DEVIATION_LOW);
                     Radio.SetTransmitPower(TxPowerLevel.Low);
                     Radio.Keyup(TxMicrophone.InternalMuted);
-                    Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(ModBalParams.Values[i], 4));
+                    Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(ModBalParams.Values[i], ModBalParams.ByteLength));
                     await Task.Delay(6000, Ct);
                     float measDevLow = await Instrument.MeasureFMDeviation();
                     measDevLow = (float)Math.Round(measDevLow);
@@ -165,7 +160,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     Radio.Keyup();
 
                     // Update initial softpot value
-                    Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(ModBalParams.Values[i], 4));
+                    Radio.SoftpotUpdate(SoftpotType.ModBalance, MotorolaXCMPRadioBase.SoftpotValueToBytes(ModBalParams.Values[i], ModBalParams.ByteLength));
 
                     // Wait
                     await Task.Delay(2500, Ct);

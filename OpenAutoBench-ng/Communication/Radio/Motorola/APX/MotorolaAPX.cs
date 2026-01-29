@@ -134,12 +134,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
                 await test.Teardown();
             }
         }
-
-        public override int[] GetTXPowerPoints()
-        {
-            Console.WriteLine($"XCMP: reading APX TX power characterization frequencies");
-            return SoftpotReadAllFrequencies(SoftpotType.TxPowerCharPoint);
-        }
         
         public override void SetTransmitPower(TxPowerLevel power)
         {

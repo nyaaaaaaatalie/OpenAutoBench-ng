@@ -274,9 +274,13 @@
 
     public enum RxBerTestPattern : byte
     {
-        CCITT_V52 = 0x00,
-        P25_1011 = 0x01,
-        NONE = 0x02
+        DIGITAL_VOICE = 0x20,
+        P25_1011 = 0x21,
+        STD_HIGH_DEV = 0x23,
+        STD_LOW_DEV = 0x24,
+        STD_CCITT_V52 = 0x25,
+        STD_MOD_FIDELITY = 0x26,
+        APCO_SILENT =0x27
     }
 
     public enum RxBerTestMode : byte

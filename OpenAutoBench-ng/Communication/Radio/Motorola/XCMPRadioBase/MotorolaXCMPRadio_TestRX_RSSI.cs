@@ -49,12 +49,12 @@ public class MotorolaXCMPRadio_TestRX_RSSI : IBaseTest
                 await Instrument.SetTxFrequency(currFreq);
 
                 await Task.Delay(500, Ct);
-                await Instrument.GenerateSignal(-47); //For future version, this should be a customizable value
+                await Instrument.GenerateSignal(-50); //For future version, this should be a customizable value, Note: R2670 max gen level on RF I/O port is -50 dBm
                 await Task.Delay(1500, Ct);
                 byte rssi = Radio.GetStatus(StatusOperation.RSSI)[0];
 
                 await Instrument.StopGenerating();
-                Report.AddResult(OpenAutoBench.ResultType.RSSI, (float)rssi, 150, 150, 255, currFreq);
+                Report.AddResult(OpenAutoBench.ResultType.RSSI, (float)rssi, 150, 140, 255, currFreq);
                 LogCallback(String.Format("Measured RSSI at {0:0.000000} MHz: {1}", (currFreq / 1000000D), rssi));
             }
         }

@@ -1,7 +1,8 @@
-﻿using OpenAutoBench_ng.Communication.Instrument;
+﻿using CSPID;
+using OpenAutoBench_ng.Communication.Instrument;
+using OpenAutoBench_ng.Communication.Radio.Motorola.APX;
 using OpenAutoBench_ng.Communication.Radio.Motorola.RSSRepeaterBase;
 using OpenAutoBench_ng.OpenAutoBench;
-using CSPID;
 
 namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 {
@@ -12,7 +13,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         protected double freqErrMax = 50.0;
 
         // Test Parameters
-        MotorolaXCMPRadioBase.SoftpotParams RefOscParams;
+        protected MotorolaXCMPRadioBase.SoftpotParams RefOscParams;
 
         public MotorolaXCMPRadio_TestTX_ReferenceOscillator(XCMPRadioTestParams testParams) : base("TX: Reference Oscillator", testParams.report, testParams.instrument, testParams.callback, testParams.ct)
         {
@@ -28,13 +29,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         {
             // Setup measurement
             LogCallback(String.Format("Setting up for {0}", Name));
-
-            // Get Ref Osc softpot parameters
-            RefOscParams = Radio.SoftpotGetParams(SoftpotType.RefOsc);
-
-            // Ensure we only got one freq
-            if (RefOscParams.Frequencies.Length > 1)
-                throw new Exception($"Ref Osc softpot returned more than 1 frequency, this is not currently supported!");
 
             // Configure Instrument
             await Instrument.SetDisplay(InstrumentScreen.Monitor);
@@ -75,6 +69,16 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
 
             try
             {
+                double kp;
+                if (MotorolaAPX_RefData.isFreon(Radio))
+                {
+                    kp = -1.0;
+                }
+                else
+                {
+                    kp = 1.0;
+                }
+
                 // Create and setup softpot tuning loop
                 TuningLoops.SoftpotTuningLoop loop = new TuningLoops.SoftpotTuningLoop(
                     Radio,
@@ -86,7 +90,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     10.0,                               // most instruments should be able to maintain accuracy to within +/- 10 Hz,
                     5.0,                                // Softpot Variance, TODO: Tweak This
                     new Range<double>(-10000, 10000),   // +/- 10kHz seems reasonable
-                    new PIDGains(-1.0, 0.0, 0.0),       // note negative feedback required
+                    new PIDGains(kp, 0.0, 0.0),       // note negative feedback required
                     3000,                                // Wait 1s for each measurement
                     60,                                 // 30 second test timeout
                     LogCallback,

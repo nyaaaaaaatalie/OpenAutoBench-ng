@@ -94,7 +94,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
                     }
                     // return the array
                     return msg;
-                } 
+                }
             }
 
             /// <summary>
@@ -778,12 +778,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             return freqs;
         }
 
-        public virtual int[] GetTXPowerPoints()
-        {
-            // Implemented by derived classes
-            throw new NotImplementedException();
-        }
-
         public virtual void SetTransmitPower(TxPowerLevel power)
         {
             Console.WriteLine($"XCMP: setting TX power to {Enum.GetName(power)}");
@@ -809,9 +803,28 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
             Console.WriteLine($"XCMP: setting RX config to {Enum.GetName(option)}");
 
             XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RECEIVE_CONFIG);
-            msg.Data = new byte[1] { (byte)option };
+
+            if (option == XCMPRadioReceiveOption.STD_1011)
+            {
+                msg.Data = new byte[2]
+                {
+            (byte)option,              // 0x21
+            (byte)RxModulation.C4FM    // 0x00
+                };
+            }
+            else
+            {
+                msg.Data = new byte[1]
+                {
+            (byte)option
+                };
+            }
 
             Send(msg);
+
+            XcmpMessage rx = new XcmpMessage(MsgType.REQUEST, Opcode.RECEIVE);
+            rx.Data = new byte[1] { 0x01 };
+            Send(rx);
         }
 
         /// <summary>
@@ -823,37 +836,62 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         {
             Console.WriteLine($"XCMP: measuring P25 BER using {nIntFrames} frames of integration");
 
-            // Configure the RX chain
-            XcmpMessage msg = new XcmpMessage(MsgType.REQUEST, Opcode.RECEIVE_CONFIG);
-            msg.Data = new byte[2]
+            if (nIntFrames <= 0 || nIntFrames > 255)
+                throw new ArgumentOutOfRangeException(nameof(nIntFrames), "Integration frames must be 1..255.");
+
+            //BER Mode need to be disabled in-between iterations 
+            void StopBer()
             {
-                (byte)RxBerTestPattern.P25_1011,
-                (byte)RxModulation.C4FM
-            };
-            Send(msg);
+                try
+                {
+                    var stop = new XcmpMessage(MsgType.REQUEST, Opcode.RX_BER_CONTROL);
+                    stop.Data = new byte[2]
+                    {
+                        (byte)RxBerTestMode.DISABLED,
+                        0x00
+                    };
+                    Send(stop);
+                }
+                catch
+                {
+                    //To-Do: Error handling
+                }
+            }
 
-            Thread.Sleep(500);
-
-            // Setup for the test
-            msg = new XcmpMessage(MsgType.REQUEST, Opcode.RX_BER_CONTROL);
-            msg.Data = new byte[2]
+            try
             {
-                (byte)RxBerTestMode.CONTINUOUS,
-                (byte)nIntFrames
-            };
-            Send(msg);
+                // Start BER integration
+                var start = new XcmpMessage(MsgType.REQUEST, Opcode.RX_BER_CONTROL);
+                start.Data = new byte[2]
+                {
+                    (byte)RxBerTestMode.CONTINUOUS,
+                    (byte)nIntFrames
+                };
+                Send(start);
 
-            // Wait for the requested number of frames
-            Thread.Sleep(800 * nIntFrames);
+                // Wait long enough for integration
+                Thread.Sleep(800 * nIntFrames);
 
-            // Request an RX BER report
-            msg = new XcmpMessage(MsgType.REQUEST, Opcode.RX_BER_SYNC_REPORT);
-            XcmpMessage resp = Send(msg);
+                // Request an RX BER report
+                var rpt = new XcmpMessage(MsgType.REQUEST, Opcode.RX_BER_SYNC_REPORT);
+                var resp = Send(rpt);
 
-            //System.Threading.Thread.Sleep(500);
+                // Some radios prepend a 3-byte header before 5-byte BER chunks
+                byte[] ber = resp.Data;
+                if (ber.Length % 5 != 0 && ber.Length >= 3 && ((ber.Length - 3) % 5 == 0))
+                {
+                    ber = ber.Skip(3).ToArray();
+                }
 
-            // Parse the response
-            return CalculateP25BER(resp.Data, nIntFrames);
+                // Parse
+                return CalculateP25BER(ber, nIntFrames);
+            }
+            finally
+            {
+                // Ensure we always disable BER Continuous integration to prevent OpCode Errors in the iteration n=2
+                StopBer();
+                Thread.Sleep(200);
+            }
         }
 
         /// <summary>
@@ -862,42 +900,58 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XCMPRadioBase
         /// <param name="berBytes">the array of BER responses, must be a multiple of 5</param>
         /// <param name="nFrames">the number of total frames integrated per measurement</param>
         /// <returns></returns>
-        private static double CalculateP25BER(byte[] berBytes, int nFrames)
+        private static double CalculateP25BER(byte[] reportPayload, int integrationFrames)
         {
-            // Ensure length is correct
-            if (berBytes.Length % 5 != 0)
-                throw new ArgumentException($"BER byte array must be a multiple of 5 (got length {berBytes.Length})");
+            if (reportPayload == null)
+                throw new ArgumentNullException(nameof(reportPayload));
 
-            // Calculate number of BER frames
-            int frames = berBytes.Length / 5;
+            if (integrationFrames <= 0 || integrationFrames > 255)
+                throw new ArgumentOutOfRangeException(nameof(integrationFrames), "Integration frames must be in range 1..255.");
 
-            // Number of bits in a single P25 frame
-            const int P25_FRAME_BITS = 3456;
+            // Each BER report chunk is exactly 5 bytes.
+            const int REPORT_CHUNK_BYTES = 5;
 
-            // Running total bit errors count
-            int totalBitErrors = 0;
-            // Total number of bits to count against
-            int totalBits = 0;
+            if (reportPayload.Length == 0 || (reportPayload.Length % REPORT_CHUNK_BYTES) != 0)
+                throw new ArgumentException(
+                    $"BER report payload length must be a non-zero multiple of {REPORT_CHUNK_BYTES} bytes (got {reportPayload.Length}).",
+                    nameof(reportPayload));
 
-            // Iterate over each report
-            for (int i = 0; i < frames; i++)
+            const int P25_BITS_PER_FRAME = 3456;
+
+            int chunkCount = reportPayload.Length / REPORT_CHUNK_BYTES;
+
+            long totalBitErrors = 0; // total number of errored bits across all accepted (synced) chunks
+            long totalBitsTested = 0; // denominator: total bits tested across all accepted (synced) chunks
+
+            for (int chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++)
             {
-                // Get the frame bytes
-                byte[] frame = berBytes.Skip(i * 5).Take(5).ToArray();
-                // Extract frame number
-                byte frame_n = frame[0];
-                // Extract sync/nosync
-                RxBerSyncStatus status = (RxBerSyncStatus)frame[1];
-                // If no sync or lost sync, ignore
-                if (status == RxBerSyncStatus.NO_SYNC || status == RxBerSyncStatus.LOST)
+                int offset = chunkIndex * REPORT_CHUNK_BYTES;
+
+                byte reportIndex = reportPayload[offset];
+                byte syncStatusRaw = reportPayload[offset + 1];
+
+                // Only count chunks where the radio reports it was synced.
+                if (syncStatusRaw != (byte)RxBerSyncStatus.SYNCED)
                     continue;
-                // Add bit errors to running total
-                totalBitErrors += (int)BitConverter.ToUInt32(frame.Skip(2).Take(3).ToArray());
-                // The total number of bits for this report is the number of frames integrated plus the frame bit count
-                totalBits += (P25_FRAME_BITS * nFrames);
+
+                // The bit-error counter is 24-bit unsigned big-endian (3 bytes).
+                int bitErrorsThisChunk =
+                    (reportPayload[offset + 2] << 16) |
+                    (reportPayload[offset + 3] << 8) |
+                    (reportPayload[offset + 4]);
+
+                totalBitErrors += bitErrorsThisChunk;
+
+                // Each chunk corresponds to "integrationFrames" frames worth of bits.
+                totalBitsTested += (long)P25_BITS_PER_FRAME * (long)integrationFrames;
             }
-            // Return the percentage of bit errors
-            return (totalBitErrors / totalBits);
+
+            // If we never saw a synced chunk, BER is not meaningful for this report.
+            if (totalBitsTested == 0)
+                return double.NaN;
+
+            //BER as a FRACTION (0..1), then multiplied by 100 to display percent.
+            return ((double)totalBitErrors / (double)totalBitsTested)*100;
         }
 
         /// <summary>

@@ -18,8 +18,8 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
         {
             _serialPort = new SerialPort(portName);
             _serialPort.BaudRate = baudrate;
-            // set 3sec timeout
-            _serialPort.ReadTimeout = 3000;
+            // set 5sec timeout
+            _serialPort.ReadTimeout = 5000;
             switch (delimeter)
             {
                 case Settings.SerialNewlineType.LF:
@@ -33,7 +33,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.Connection
                     break;
             }
             _serialPort.DtrEnable = useDTR;
-            // _serialPort.RtsEnable = true;//this is needed for R2670
+
 
         }
 
