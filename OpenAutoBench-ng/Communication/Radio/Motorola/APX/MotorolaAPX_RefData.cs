@@ -383,5 +383,22 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.APX
 
             return TxFrequencies.ToArray();
         }
+
+        public static bool isFreon(MotorolaXCMPRadioBase radio)
+        {
+            if (
+                radio.ModelNumber.EndsWith("BN") ||
+                radio.ModelNumber.EndsWith("CN") ||
+                //APX900
+                radio.ModelNumber.StartsWith("H92") ||
+                //APX8000
+                radio.ModelNumber.StartsWith("H91") ||
+                //APX8500
+                radio.ModelNumber.StartsWith("H91"))
+            {
+                return true;
+            }
+            return false;
+        }
     }
 }

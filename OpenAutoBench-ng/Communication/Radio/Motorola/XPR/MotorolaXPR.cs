@@ -47,7 +47,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XPR
             testParams.radio.ResetRadio();
         }
 
-        public override int[] GetTXPowerPoints()
+       /* public override int[] GetTXPowerPoints()
         {
             SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ_ALL, SoftpotType.TxPowerCharPoint);
 
@@ -62,6 +62,6 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.XPR
             }
 
             return returnVal;
-        }
+        }*/
     }
 }

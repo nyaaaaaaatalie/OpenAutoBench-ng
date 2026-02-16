@@ -52,7 +52,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.Astro25
             */
         }
 
-        public override int[] GetTXPowerPoints()
+       /* public override int[] GetTXPowerPoints()
         {
             SoftpotMessage msg = new SoftpotMessage(MsgType.REQUEST, SoftpotOperation.READ, SoftpotType.TxPowerCharPoint);
 
@@ -69,7 +69,7 @@ namespace OpenAutoBench_ng.Communication.Radio.Motorola.Astro25
             returnVal[1] |= resp.Value[3];
 
             return returnVal;
-        }
+        }*/
         
     }
 }

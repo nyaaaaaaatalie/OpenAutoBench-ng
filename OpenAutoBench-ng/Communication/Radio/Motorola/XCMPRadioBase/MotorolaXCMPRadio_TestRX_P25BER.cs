@@ -32,10 +32,18 @@ public class MotorolaXCMPRadio_TestRX_P25BER : IBaseTest
     {
         try
         {
+            Radio.SetReceiveConfig(XCMPRadioReceiveOption.STD_1011);
             for (int i= 0; i < TXFrequencies.Length; i++)
             {
                 int currFreq = TXFrequencies[i];
-                Radio.SetReceiveConfig(XCMPRadioReceiveOption.STD_1011);
+
+                // Skip any 7/800 TX-Only Freqs
+                if (currFreq is > 785000000 and < 850000000)
+                {
+                    Console.WriteLine($"Skipping BER test for frequency {currFreq / 1e6:0.000000} MHz, TX-only 7/800 MHz band");
+                    continue;
+                }
+
                 Radio.SetRXFrequency(currFreq, Bandwidth.BW_25kHz, RxModulation.C4FM);
                 await Instrument.SetTxFrequency(currFreq);
                 await Task.Delay(5000, Ct);

@@ -22,6 +22,8 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         private int txFreq;
 
+        private bool isDeviationTest = false;
+
 
         public GeneralDynamics_R2670Instrument(IInstrumentConnection conn)
         {
@@ -65,7 +67,7 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         public async Task StopGenerating()
         {
-            // The R2670 continuously transmit in generate mode. To stop generating, we go bact to monitor mode.
+            // The R2670 continuously transmit in generate mode. To stop generating, we go back to monitor mode.
             await Transmit($"ARM 140.00000 1, 1, 1\r");
             await Transmit("RM 140.00000, 1, 1, 1, 1\r"); 
         }
@@ -82,16 +84,22 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         public async Task SetRxFrequency(int frequency, testMode mode)
         {
+            // The Deviation Balance test requires the testset to be in wideband for proper accuracy
+            int bandwidth = 1;
+            if (isDeviationTest)
+            {
+                bandwidth = 0; 
+            }
 
             if (mode == testMode.ANALOG)
             {
                 string freq = (frequency / 1_000_000.0).ToString("F5");
-                await Transmit($"RM {freq} 1, 1, 1, 1\r");
+                await Transmit($"RM {freq}, 1, 1, 1, {bandwidth}\r");
             }
             else if (mode == testMode.P25)
             {
                 string freq = (frequency / 1_000_000.0).ToString("F5");
-                await Transmit($"ARM {freq} 1, 1, 1\r");
+                await Transmit($"ARM {freq}, 1, 1, 1\r");
             }
             else if (mode == testMode.DMR)
             {
@@ -250,42 +258,55 @@ namespace OpenAutoBench_ng.Communication.Instrument.GeneralDynamics_R2670
 
         public async Task SetupRefOscillatorTest_P25()
         {
+            isDeviationTest = false;
             //Not implemented, but shouldn't raise an exception
         }
 
         public async Task SetupRefOscillatorTest_FM()
         {
+            isDeviationTest = false;
             await Transmit("MODE 0\r"); // Standard mode
-            await Transmit("RM 136.00000, 1, 1, 1, 0\r"); // Monitor, 20db attenuation, RF Port, FM, Wideband // The frequency is not relevant it will be adjusted during test sequence
+            await Transmit("RM 136.00000, 1, 1, 1, 1\r"); // Monitor, 20db attenuation, RF Port, FM, Narrowband // The frequency is not relevant it will be adjusted during test sequence
 
         }
 
         public async Task SetupTXPowerTest()
         {
+            isDeviationTest = false;
             await Transmit("MODE 0\r"); // Standard mode
-            await Transmit("RM 137.00000, 1, 1, 1, 0\r"); // Monitor, 20db attenuation, RF Port, FM, Wideband // The frequency is not relevant it will be adjusted during test sequence
+            await Transmit("RM 137.00000, 1, 1, 1, 1\r"); // Monitor, 20db attenuation, RF Port, FM, Narrowband // The frequency is not relevant it will be adjusted during test sequence
         }
 
         public async Task SetupTXDeviationTest()
         {
+            isDeviationTest = true;
             await Transmit("MODE 0\r"); // Standard mode
-            await Transmit("RM 138.00000, 1, 1, 1, 1\r"); // Monitor, 20db attenuation, RF Port, FM, Wideband // The frequency is not relevant it will be adjusted during test sequence
+            await Transmit("OB\r");//Enter bar graph screen
+            await Transmit("EOB 1,0\r"); //Enter enlarged bar grap screen and set deviation measurements to averaged RMS
+            await Task.Delay(200);
+            await Transmit("GK 2, 6\r"); // Press return key to exit enlarged bar graph mode
+            await Task.Delay(200);
+            await Transmit("RM 138.00000, 1, 1, 1, 0\r"); // Monitor, 20db attenuation, RF Port, FM, Wideband // The frequency is not relevant it will be adjusted during test sequence
             await Transmit("FF 0, 2\r");
         }
 
         public async Task SetupTXP25BERTest()
         {
+            isDeviationTest = false;
             throw new NotImplementedException("The R2670 does not have a command to get the BER remotely. This test is not available");
         }
 
         public async Task SetupRXTestFMMod()
         {
+            isDeviationTest = false;
             await Transmit("MODE 0\r"); // Standard mode
+            //No need to place on Generate mode yet as the R2670 generates as soon as it is in gen mode
             await Transmit("RM 139.00000, 1, 1, 1, 1\r"); // Monitor, 20db attenuation, RF Port, FM, Narrowband // The frequency is not relevant it will be adjusted during test sequence
         }
 
         public async Task SetupRXTestP25BER()
         {
+            isDeviationTest = false;
             await Transmit("MODE 5\r");
             await Task.Delay(3000);
             await Transmit("ARG 141.00000, 1, -120.0, 1\r");
